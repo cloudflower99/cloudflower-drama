@@ -41,6 +41,23 @@ jobs:
         run: python -m pip install Pillow==11.3.0
       - name: Optimize poster covers
         run: python optimize_covers.py
+      - name: Prevent search indexing of HTML pages
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          import re
+          pages = list(Path('site').rglob('*.html'))
+          if not pages:
+              raise SystemExit('No HTML pages found')
+          for page in pages:
+              text = page.read_text(encoding='utf-8')
+              tag = '<meta name="robots" content="noindex, nofollow">'
+              text, count = re.subn(r'(?i)(<head(?:\s[^>]*)?>)', lambda m: m.group(1) + '\n' + tag, text, count=1)
+              if count != 1:
+                  raise SystemExit(f'Missing head element: {page}')
+              page.write_text(text, encoding='utf-8')
+              print(f'Added noindex: {page}')
+          PYCODE
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
