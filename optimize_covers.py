@@ -68,7 +68,5 @@ replace_paths(data)
 replace_paths(manifest)
 atomic_json(data_path, data)
 atomic_json(manifest_path, manifest)
-# References have been persisted; original files can now be removed from the artifact and cache.
-for source in mapping:
-    (site / source).unlink(missing_ok=True)
+# Keep original paths available to browsers holding an older cached data.json.
 print(f'Optimized {count} covers: {original_bytes} -> {saved_bytes} bytes; skipped {skipped}.', flush=True)
