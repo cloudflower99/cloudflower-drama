@@ -24,6 +24,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Restore previous sync cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .sync-cache
+            site/covers
+          key: notion-site-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            notion-site-v1-
       - name: Build from Notion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
