@@ -56,50 +56,72 @@ def image(block):
     except Exception as e:
         print('Warning: cover unavailable for block',block['id'],type(e).__name__,str(e)[:100]); return old.get('path','') if old_path.is_file() else ''
 
+def parse_group(group, default_date=''):
+    columns=children(group['id']); blocks=[]
+    for col in columns:
+        if col['type']=='column': blocks.extend(children(col['id']))
+    title=next((text(b).strip() for b in blocks if b['type'] in ('heading_1','heading_2','heading_3')), '')
+    if not title: return None
+    paras=[b for b in blocks if b['type']=='paragraph']; date=default_date; rating=''; description=[]; links={}
+    for b in paras:
+        s=text(b).strip(); matches=re.search(r'(?:更新日期|视频发布日期)\s*[:：]\s*(\d{4})年(\d{1,2})月(\d{1,2})日',s)
+        if matches: date='%04d-%02d-%02d'%tuple(map(int,matches.groups()));continue
+        if '观众评分' in s: rating=s;continue
+        for t in b.get('paragraph',{}).get('rich_text',[]):
+            u=t.get('href') or ((t.get('text') or {}).get('link') or {}).get('url')
+            label=t.get('plain_text','')
+            if u and label in ('百度网盘','夸克网盘','迅雷网盘') and u.startswith('https://'): links[label]=u
+        if s and not s.startswith('📥'): description.append(s)
+    img=next((b for b in blocks if b['type']=='image'),None)
+    return {'title':title,'date':date,'rating':rating,'description':'\n\n'.join(description),'links':links,'image':image(img) if img else ''}
+
 def parse_page(page, default_date=''):
     records=[]
     for group in children(page):
-        if group['type']!='column_list': continue
-        columns=children(group['id']); blocks=[]
-        for col in columns:
-            if col['type']=='column': blocks.extend(children(col['id']))
-        title=next((text(b).strip() for b in blocks if b['type'] in ('heading_1','heading_2','heading_3')), '')
-        if not title: continue
-        paras=[b for b in blocks if b['type']=='paragraph']; date=default_date; rating=''; description=[]; links={}
-        for b in paras:
-            s=text(b).strip(); matches=re.search(r'(?:更新日期|视频发布日期)\s*[:：]\s*(\d{4})年(\d{1,2})月(\d{1,2})日',s)
-            if matches: date='%04d-%02d-%02d'%tuple(map(int,matches.groups()));continue
-            if '观众评分' in s: rating=s;continue
-            for t in b.get('paragraph',{}).get('rich_text',[]):
-                u=t.get('href') or ((t.get('text') or {}).get('link') or {}).get('url')
-                label=t.get('plain_text','')
-                if u and label in ('百度网盘','夸克网盘','迅雷网盘') and u.startswith('https://'): links[label]=u
-            if s and not s.startswith('📥'): description.append(s)
-        img=next((b for b in blocks if b['type']=='image'),None)
-        records.append({'title':title,'date':date,'rating':rating,'description':'\n\n'.join(description),'links':links,'image':image(img) if img else ''})
+        if group['type']=='column_list':
+            item=parse_group(group,default_date)
+            if item: records.append(item)
     return records
 
-home=parse_page(ROOT); archive_pages=[x for x in children(ARCHIVE) if x['type']=='child_page' and re.match(r'^\d{4}-\d{2}-\d{2} 剧集$', x['child_page']['title'])]
+def stale(ts, now):
+    try: return now-datetime.datetime.fromisoformat(ts)>=datetime.timedelta(hours=24)
+    except (ValueError,TypeError): return True
+
+def covers_exist(entries):
+    return all(not e.get('image') or (out/e['image']).is_file() for e in entries)
+
+now=datetime.datetime.now(datetime.timezone.utc)
+home_groups=cache.get('home_groups',{}); updated_home={}; home=[]
+for group in children(ROOT):
+    if group['type']!='column_list': continue
+    old=home_groups.get(group['id'],{}); entry=old.get('entry')
+    refresh=(not entry or old.get('source_stamp')!=group.get('last_edited_time') or stale(old.get('refreshed_at',''),now) or not covers_exist([entry]))
+    if refresh:
+        entry=parse_group(group)
+        if not entry: raise SystemExit('Cannot parse home resource; refusing to publish incomplete catalog: '+group['id'])
+        updated_home[group['id']]={'source_stamp':group.get('last_edited_time'),'refreshed_at':now.isoformat(),'entry':entry}
+        print('Home:',entry['title'],'refreshed',flush=True)
+    else:
+        updated_home[group['id']]=old
+        print('Home:',entry['title'],'cached',flush=True)
+    home.append(entry)
+archive_pages=[x for x in children(ARCHIVE) if x['type']=='child_page' and re.match(r'^\d{4}-\d{2}-\d{2} 剧集$', x['child_page']['title'])]
 if len(archive_pages)<50: raise SystemExit('Archive looks incomplete: fewer than 50 daily pages; refusing to publish.')
-items=home[:]; now=datetime.datetime.now(datetime.timezone.utc); local_day=(now+datetime.timedelta(hours=8)).date(); updated_pages={}
+items=home[:]; updated_pages={}
 for p in archive_pages:
-    day=p['child_page']['title'][:10]; old=page_cache.get(p['id'],{}); refreshed=old.get('refreshed_at','')
-    try: age=now-datetime.datetime.fromisoformat(refreshed)
-    except (ValueError,TypeError): age=datetime.timedelta(days=999)
-    try: recent=(local_day-datetime.date.fromisoformat(day)).days<=7
-    except ValueError: recent=True
-    needs_refresh=(not old.get('entries') or old.get('day')!=day or old.get('source_stamp')!=p.get('last_edited_time') or age>=datetime.timedelta(hours=24) or recent)
+    day=p['child_page']['title'][:10]; old=page_cache.get(p['id'],{}); entries=old.get('entries',[])
+    needs_refresh=(not entries or old.get('day')!=day or old.get('source_stamp')!=p.get('last_edited_time') or stale(old.get('refreshed_at',''),now) or not covers_exist(entries))
     if needs_refresh:
         entries=parse_page(p['id'],day)
         if not entries: raise SystemExit('No entries found in '+day+'; refusing to publish.')
         updated_pages[p['id']]={'day':day,'source_stamp':p.get('last_edited_time'),'refreshed_at':now.isoformat(),'entries':entries}
         print(day,len(entries),'refreshed',flush=True)
     else:
-        entries=old['entries']; updated_pages[p['id']]=old
+        updated_pages[p['id']]=old
         print(day,len(entries),'cached',flush=True)
     items.extend(entries)
 if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomplete catalog.')
 items.sort(key=lambda x:x['date'],reverse=True)
 (out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
-tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
+tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache,'home_groups':updated_home},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
 print('Built',len(items),'shows')
