@@ -36,7 +36,7 @@ jobs:
       - name: Build from Notion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-        run: python sync.py
+        run: python sync_new.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
