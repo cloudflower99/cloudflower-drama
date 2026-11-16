@@ -5,6 +5,13 @@ ROOT='41a26fd4d86d80e5ac94e79d297e626a'
 ARCHIVE='18826fd4d86d82fdb03001c08cafbf5c'
 BASE='https://api.notion.com/v1/'
 out=pathlib.Path('site'); images=out/'covers'; images.mkdir(exist_ok=True)
+cache_dir=pathlib.Path('.sync-cache'); cache_dir.mkdir(exist_ok=True)
+cache_file=cache_dir/'manifest.json'
+try:
+    cache=json.loads(cache_file.read_text(encoding='utf-8')) if cache_file.exists() else {}
+    if cache.get('version')!=1: cache={}
+except (ValueError,OSError): cache={}
+page_cache=cache.get('pages',{}); image_cache=cache.get('images',{})
 headers={'Authorization':'Bearer '+TOKEN,'Notion-Version':'2022-06-28'}
 last=0
 
@@ -34,6 +41,8 @@ def text(b):
     return ''.join(t.get('plain_text','') for t in b.get(b['type'],{}).get('rich_text',[]))
 
 def image(block):
+    old=image_cache.get(block['id'],{}); old_path=out/old.get('path','__missing__')
+    if old.get('stamp')==block.get('last_edited_time') and old_path.is_file(): return old['path']
     obj=block['image']; kind=obj.get('type'); src=obj.get(kind,{}).get('url')
     if not src or not src.startswith('https://'): return ''
     try:
@@ -43,9 +52,9 @@ def image(block):
         elif body.startswith((b'GIF87a',b'GIF89a')): ext='gif'
         elif body[:4]==b'RIFF' and body[8:12]==b'WEBP': ext='webp'
         if not ext or len(body)>15000000: raise ValueError('unsupported image: '+typ+' ('+str(len(body))+' bytes)')
-        name=block['id']+'.'+ext; (images/name).write_bytes(body);return 'covers/'+name
+        name=block['id']+'.'+ext; (images/name).write_bytes(body); path='covers/'+name; image_cache[block['id']]={'stamp':block.get('last_edited_time'),'path':path}; return path
     except Exception as e:
-        print('Warning: cover unavailable for block',block['id'],type(e).__name__,str(e)[:100]);return ''
+        print('Warning: cover unavailable for block',block['id'],type(e).__name__,str(e)[:100]); return old.get('path','') if old_path.is_file() else ''
 
 def parse_page(page, default_date=''):
     records=[]
@@ -72,12 +81,25 @@ def parse_page(page, default_date=''):
 
 home=parse_page(ROOT); archive_pages=[x for x in children(ARCHIVE) if x['type']=='child_page' and re.match(r'^\d{4}-\d{2}-\d{2} 剧集$', x['child_page']['title'])]
 if len(archive_pages)<50: raise SystemExit('Archive looks incomplete: fewer than 50 daily pages; refusing to publish.')
-items=home[:]
+items=home[:]; now=datetime.datetime.now(datetime.timezone.utc); local_day=(now+datetime.timedelta(hours=8)).date(); updated_pages={}
 for p in archive_pages:
-    day=p['child_page']['title'][:10]; entries=parse_page(p['id'],day)
-    if not entries: raise SystemExit('No entries found in '+day+'; refusing to publish.')
-    items.extend(entries);print(day,len(entries),flush=True)
+    day=p['child_page']['title'][:10]; old=page_cache.get(p['id'],{}); refreshed=old.get('refreshed_at','')
+    try: age=now-datetime.datetime.fromisoformat(refreshed)
+    except (ValueError,TypeError): age=datetime.timedelta(days=999)
+    try: recent=(local_day-datetime.date.fromisoformat(day)).days<=7
+    except ValueError: recent=True
+    needs_refresh=(not old.get('entries') or old.get('day')!=day or old.get('source_stamp')!=p.get('last_edited_time') or age>=datetime.timedelta(hours=24) or recent)
+    if needs_refresh:
+        entries=parse_page(p['id'],day)
+        if not entries: raise SystemExit('No entries found in '+day+'; refusing to publish.')
+        updated_pages[p['id']]={'day':day,'source_stamp':p.get('last_edited_time'),'refreshed_at':now.isoformat(),'entries':entries}
+        print(day,len(entries),'refreshed',flush=True)
+    else:
+        entries=old['entries']; updated_pages[p['id']]=old
+        print(day,len(entries),'cached',flush=True)
+    items.extend(entries)
 if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomplete catalog.')
 items.sort(key=lambda x:x['date'],reverse=True)
-(out/'data.json').write_text(json.dumps({'generated':datetime.datetime.now(datetime.timezone.utc).isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
+(out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
+tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
 print('Built',len(items),'shows')
