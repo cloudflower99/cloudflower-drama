@@ -37,6 +37,10 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: python sync_new.py
+      - name: Install image optimizer
+        run: python -m pip install Pillow==11.3.0
+      - name: Optimize poster covers
+        run: python optimize_covers.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
