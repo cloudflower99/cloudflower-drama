@@ -73,7 +73,7 @@ def parse_group(group, default_date=''):
             if u and label in ('百度网盘','夸克网盘','迅雷网盘') and u.startswith('https://'): links[label]=u
         if s and not s.startswith('📥'): description.append(s)
     img=next((b for b in blocks if b['type']=='image'),None)
-    return {'title':title,'date':date,'rating':rating,'description':'\n\n'.join(description),'links':links,'image':image(img) if img else ''}
+    return {'title':title,'date':date,'rating':rating,'description':'\n\n'.join(description),'links':links,'image':image(img) if img else '', 'added_at': group.get('created_time','') if group.get('created_time','') >= '2026-11-17T03:40:00Z' else ''}
 
 def parse_page(page, default_date=''):
     records=[]
@@ -121,7 +121,8 @@ for p in archive_pages:
         print(day,len(entries),'cached',flush=True)
     items.extend(entries)
 if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomplete catalog.')
-items.sort(key=lambda x:x['date'],reverse=True)
+# New additions sort first within their resource date; historical order is preserved.
+items.sort(key=lambda x:(x['date'],x.get('added_at','')),reverse=True)
 (out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
 tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache,'home_groups':updated_home},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
 print('Built',len(items),'shows')
