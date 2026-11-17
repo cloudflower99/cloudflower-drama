@@ -1,4 +1,4 @@
-isename: Sync from Notion and publish
+name: Sync from Notion and publish
 on:
   workflow_dispatch:
     inputs:
@@ -93,4 +93,3 @@ jobs:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v4
- SystemExi
