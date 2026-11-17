@@ -16,8 +16,8 @@ function rebuildScores(){
     reviewByTitle.set(titles[i],{option,reviews,count:rated.length,average:rated.length?(rated.reduce((sum,r)=>sum+r.rating,0)/rated.length).toFixed(1):null});
   }
 }
-async function refreshReviews(){try{let r=await fetch('https://cloudflower-reviews.lilyanna-sanders-e5d.workers.dev/reviews');if(!r.ok)return;reviewRows=(await r.json()).reviews;reviewReady=true;rebuildScores();if(all.length){let keep=shown;grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}}catch{}}
-fetch('https://cloudflower-reviews.lilyanna-sanders-e5d.workers.dev/options').then(r=>r.ok?r.json():Promise.reject()).then(x=>{optionNames=x.options;return refreshReviews()}).catch(()=>{});setInterval(refreshReviews,30000);
+async function refreshReviews(){try{let r=await fetch('https://api.cloudofflower.ccwu.cc/reviews');if(!r.ok)return;reviewRows=(await r.json()).reviews;reviewReady=true;rebuildScores();if(all.length){let keep=shown;grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}}catch{}}
+fetch('https://api.cloudofflower.ccwu.cc/options').then(r=>r.ok?r.json():Promise.reject()).then(x=>{optionNames=x.options;return refreshReviews()}).catch(()=>{});setInterval(refreshReviews,30000);
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e}
 function reviewPanel(data){
   const section=element('section','card-reviews');section.setAttribute('aria-label','本剧最新评价');
