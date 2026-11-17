@@ -1,6 +1,100 @@
 name: Sync from Notion and publish
 on:
   workflow_dispatch:
+    inputs:
+      refresh_scope:
+        description: '强制刷新某个日期页（页 ID）或 home'
+        required: false
+        type: string
+  schedule:
+    - cron: '17 */3 * * *'
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore previous sync cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .sync-cache
+            site/covers
+          key: notion-site-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            notion-site-v1-
+      - name: Refresh changed content only
+        env:
+          REFRESH_SCOPE: ${{ inputs.refresh_scope }}
+        run: |
+          python - <<'PYCODE'
+          import json, os, pathlib
+          p = pathlib.Path('.sync-cache/manifest.json')
+          scope = os.environ.get('REFRESH_SCOPE', '').strip()
+          if p.is_file() and scope:
+              data = json.loads(p.read_text(encoding='utf-8'))
+              if scope == 'home':
+                  data['home_groups'] = {}
+              else:
+                  clean = scope.replace('-', '').lower()
+                  if len(clean) != 32 or any(c not in '0123456789abcdef' for c in clean):
+                      raise SystemExit('Invalid page ID')
+                  pages = data.get('pages', {})
+                  for key in list(pages):
+                      if key.replace('-', '').lower() == clean:
+                          del pages[key]
+              p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+              print('Invalidated selected cache scope')
+          PYCODE
+      - name: Build from Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: python sync_new.py
+      - name: Install image optimizer
+        run: python -m pip install Pillow==11.3.0
+      - name: Optimize poster covers
+        run: python optimize_covers.py
+      - name: Prevent search indexing of HTML pages
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          import re
+          pages = list(Path('site').rglob('*.html'))
+          if not pages:
+              raise SystemExit('No HTML pages found')
+          for page in pages:
+              text = page.read_text(encoding='utf-8')
+              tag = '<meta name="robots" content="noindex, nofollow">'
+              text, count = re.subn(r'(?i)(<head(?:\s[^>]*)?>)', lambda m: m.group(1) + '\n' + tag, text, count=1)
+              if count != 1:
+                  raise SystemExit(f'Missing head element: {page}')
+              page.write_text(text, encoding='utf-8')
+              print(f'Added noindex: {page}')
+          PYCODE
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4name: Sync from Notion and publish
+on:
+  workflow_dispatch:
   schedule:
     - cron: '17 */3 * * *'
   push:
