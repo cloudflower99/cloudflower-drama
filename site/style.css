@@ -20,3 +20,90 @@ main .card .links a:hover{background:#cfe6f8}
 @media(max-width:540px){.review-time{margin-left:0}.review-snippet{padding:10px 12px}.review-head{align-items:center}}
 @media(prefers-color-scheme:dark){main .card{border-color:#43525b;box-shadow:none}main .card:hover{border-color:#68869b}main .card .date{color:#a5c1d1}main .card .rating-live{background:#493f25;color:#f1d78a}main .card .links a:hover{background:#36566b}.review-snippet{background:#263038;border-color:#354852}.review-meta{color:#bfccd4}.review-stars{color:#f0c670}}
 @media(prefers-reduced-motion:reduce){main .card .links a{transition:none}}
+
+/* Cloudflower · a quiet, sky-inspired illustrated theme */
+:root{--bg:#f7f8fd;--surface:#fff;--text:#252c42;--muted:#68718a;--line:#e2e8f2;--accent:#526fbe;--soft:#eff4ff}
+body{background:radial-gradient(ellipse 75% 300px at 85% 0%,#edf3ff 0%,transparent 75%),var(--bg);color:var(--text)}
+body header{background:rgba(255,255,255,.9);border-bottom:1px solid #e7eaf5}
+body .nav{min-height:68px}
+body .brand{letter-spacing:.02em;color:#303c60}
+body .navlink{font-weight:650;color:#536db2;border:1px solid #e1e8f8;background:#f6f8ff;padding:8px 14px;border-radius:999px}
+body .navlink:hover{background:#edf2ff}
+body .hero{position:relative;isolation:isolate;overflow:hidden;margin-top:32px;margin-bottom:54px;padding:48px 46px 44px;border:1px solid #e5e9f8;border-radius:24px;background:linear-gradient(118deg,#fff 8%,#f8fbff 50%,#f0eeff 100%);box-shadow:0 12px 35px rgba(93,112,168,.07)}
+body .hero::before{content:'';position:absolute;z-index:-1;right:-36px;bottom:-34px;width:390px;height:260px;opacity:.75;background:radial-gradient(ellipse 84px 54px at 27% 62%,#fff 99%,transparent 100%),radial-gradient(ellipse 106px 70px at 51% 53%,#fff 99%,transparent 100%),radial-gradient(ellipse 92px 58px at 73% 63%,#fff 99%,transparent 100%),radial-gradient(circle 76px at 70% 35%,#e1e5ff 99%,transparent 100%)}
+body .hero::after{content:'✦   ·   ✧';position:absolute;z-index:-1;right:13%;top:52px;color:#b9b7e4;font-size:24px;letter-spacing:12px}
+body .hero .eyebrow,body .review-page>.eyebrow{display:inline-flex;align-items:center;gap:7px;background:#eef2ff;border:1px solid #e0e7fb;border-radius:999px;padding:5px 11px;color:#6178b4;font-size:11px;letter-spacing:.12em;margin-bottom:16px}
+body .hero .eyebrow::before,body .review-page>.eyebrow::before{content:'✦';font-size:11px;color:#9aa9db}
+body .hero h1{color:#2c3654;letter-spacing:-.035em}
+body .intro{color:#68758f;margin:15px 0 24px}
+body .hero .search{max-width:650px;border-color:#dde5f5;border-radius:13px;box-shadow:0 8px 25px rgba(98,117,170,.09)}
+body .search>span{color:#899bc9;font-size:26px}
+body .search button,body #more,body .submit{background:linear-gradient(135deg,#7795df,#637ac6);color:#fff;border:0;border-radius:9px;box-shadow:0 3px 8px rgba(96,120,191,.17)}
+body .search button:hover,body #more:hover,body .submit:hover{background:linear-gradient(135deg,#6789d6,#566dbd)}
+body .hint{color:#7d89a1;font-size:13px}
+body .sectionhead{border-bottom:1px solid #e3e8f3;margin-bottom:22px}
+body .sectionhead h2,body .review-page h1{color:#2d3856}
+body .sectionhead .eyebrow{color:#8a9bc3;font-size:11px;letter-spacing:.15em}
+body .sectionhead .eyebrow::before{content:'✦ ';color:#b5a5dc}
+body .sectionhead>p{color:#8b95ad}
+body .date-controls{gap:10px 12px;margin-bottom:22px}
+body .date-controls label{font-size:14px;color:#4d5d7d}
+body .date-controls select{border-color:#e0e6f2;border-radius:10px;background:#fff;color:#455476;min-height:42px}
+body .date-controls span{font-size:13px;color:#8790a5}
+body .grid{gap:18px}
+body main .card{border:1px solid #e5eaf4;border-radius:18px;padding:20px;gap:24px;background:#fff;box-shadow:0 5px 20px rgba(75,94,145,.055);transition:border-color .2s,box-shadow .2s}
+body main .card:hover{border-color:#cbd8f2;box-shadow:0 10px 26px rgba(75,94,145,.09)}
+body .card .cover{height:270px;flex:0 0 190px;width:190px;border-radius:11px;background:#f0f3fc}
+body .card .cover img{object-fit:contain}
+body .card h3{font-size:19px;color:#2d3854;line-height:1.45;margin-bottom:9px}
+body main .card .date{color:#92a0bc;font-size:12px;letter-spacing:.04em}
+body main .card .rating-live{background:#fff7e7;color:#8b681e;border:1px solid #f7e9c9;border-radius:999px;padding:3px 10px;margin-bottom:12px;font-size:13px}
+body .summary{font-size:15px;line-height:1.6;color:#69738b;margin-bottom:15px}
+body main .card .links a{background:#f0f4ff;color:#526db0;border:1px solid #e6edfc;border-radius:9px;min-height:40px;padding:8px 12px}
+body main .card .links a:hover{background:#e6edff}
+body .card-reviews{margin-top:17px;padding-top:14px;border-color:#edf0f7}
+body .review-head strong{font-size:14px;color:#586787}
+body .review-link{font-size:13px;color:#687fc2}
+body .review-snippet{background:#f8f9fe;border-color:#f0f1f8;border-radius:10px}
+body .review-author,body .review-meta{color:#7c88a0}
+body .review-text{color:#58647c}
+body .review-page{padding-top:42px}
+body .review-page .back{display:table;color:#6c82bc}
+body .review-page .lead{color:#758098}
+body .review-page .panel,body .review-page .review-card{background:#fff;border:1px solid #e5eaf4;border-radius:17px;box-shadow:0 5px 20px rgba(75,94,145,.055)}
+body .review-page .panel h2,body .review-page .section-title h2{color:#34415e}
+body .review-page .panel h2::after,body .review-page .section-title h2::after{content:' ✧';color:#b4a8db;font-weight:400}
+body .review-page .control{background:#f9faff;border-color:#e1e7f2;border-radius:10px}
+body .review-page .combo-menu{border-color:#e2e8f4;box-shadow:0 12px 28px rgba(65,82,132,.14)}
+body .review-page .combo-option:hover,body .review-page .combo-option.active{background:#eff3ff}
+body footer{border-color:#e5eaf3;background:rgba(255,255,255,.5);color:#8792aa}
+@media(max-width:540px){
+  body .nav{min-height:64px}body .navlink{padding:7px 11px}
+  body .hero{margin:20px 18px 36px;padding:32px 22px 30px;border-radius:19px}
+  body .hero::before{right:-125px;bottom:-60px;opacity:.58;transform:scale(.75)}
+  body .hero::after{right:12px;top:20px;font-size:17px;letter-spacing:5px}
+  body .hero h1{font-size:31px}body .intro{font-size:16px}
+  body .sectionhead{margin-bottom:18px}body .grid{gap:14px}
+  body .date-controls{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 12px}body .date-controls select{width:100%}body .date-controls span{grid-column:1 / -1}
+  body main .card{padding:15px;gap:15px;border-radius:15px}
+  body .card .cover{width:100%;height:240px;flex:0 0 240px}
+  body .card h3{font-size:17px}body .summary{font-size:14px;line-height:1.55}
+  body .review-page{padding-top:24px}body .review-page .panel,body .review-page .review-card{border-radius:15px}
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#191d2b;--surface:#252b3b;--text:#edf1fa;--muted:#b0b8ca;--line:#3b4356;--accent:#b2c4ff;--soft:#333c54}
+  body{background:radial-gradient(ellipse 75% 300px at 85% 0%,#2b3350 0%,transparent 75%),var(--bg)}
+  body header{background:#242a3b;border-color:#394056}body .brand,body .sectionhead h2,body .review-page h1,body .review-page .panel h2,body .review-page .section-title h2,body .card h3{color:#edf1fa}
+  body .navlink{background:#303951;border-color:#414e6b;color:#c5d3ff}body .navlink:hover{background:#394765}
+  body .hero{background:linear-gradient(118deg,#292f43,#30334c);border-color:#424a65;box-shadow:none}body .hero::before{opacity:.1}body .hero h1{color:#f2f4ff}
+  body .hero .eyebrow,body .review-page>.eyebrow{background:#38415a;border-color:#4a5674;color:#c4d0f6}
+  body .hero .search,body .date-controls select{background:#252b3b;border-color:#4c5770;color:#edf1fa}
+  body .intro,body .hint,body .summary,body .review-page .lead{color:#b5bfd2}
+  body .sectionhead,body footer{border-color:#414a5e}body .date-controls label{color:#d0daed}
+  body main .card,body .review-page .panel,body .review-page .review-card{background:#252b3b;border-color:#3b455b;box-shadow:none}body main .card:hover{border-color:#657493}
+  body .card .cover{background:#30384e}body main .card .rating-live{background:#4b402a;color:#f0d28e;border-color:#665737}
+  body main .card .links a{background:#34415d;border-color:#425171;color:#c3d3ff}body main .card .links a:hover{background:#40516f}
+  body .review-snippet{background:#30384a;border-color:#3d475c}body .review-text,body .review-head strong{color:#d3dbea}
+  body .review-page .control{background:#202637;border-color:#46516a}body footer{background:#202535}
+}
+@media(prefers-reduced-motion:reduce){body main .card,body main .card .links a{transition:none}}
