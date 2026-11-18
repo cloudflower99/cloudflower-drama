@@ -25,9 +25,22 @@ def request(url, headers=None):
         try:
             with urllib.request.urlopen(urllib.request.Request(url,headers=headers or {}),timeout=45) as r: return r.read(),r.headers
         except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError) as e:
-            if isinstance(e,urllib.error.HTTPError) and e.code not in (429,500,502,503,504): raise
+            delay=min(2**attempt,30)
+            if isinstance(e,urllib.error.HTTPError):
+                if e.code not in (429,529,500,502,503,504): raise
+                if e.code in (429,529):
+                    try: info=json.loads(e.read())
+                    except (ValueError,UnicodeDecodeError): info={}
+                    reason=info.get('additional_data',{}).get('rate_limit_reason','unknown')
+                    raw=e.headers.get('Retry-After')
+                    try: delay=max(0,float(raw)) if raw is not None else delay
+                    except (ValueError,TypeError): pass
+                    print(f'Notion 限流: HTTP {e.code}, reason={reason}, Retry-After={raw}',flush=True)
+                    if reason=='public_api_request_blocked': raise RuntimeError('Notion 已限制该连接的 API 访问，请联系 Notion 支持') from None
+                    if delay>600: raise RuntimeError(f'Notion 要求等待 {delay} 秒，请稍后重试') from None
             if attempt==5: raise
-            time.sleep(min(2**attempt,30))
+            print(f'等待 {delay} 秒后重试',flush=True)
+            time.sleep(delay+0.25)
 
 def children(block):
     all=[]; cursor=None
