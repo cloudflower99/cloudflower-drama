@@ -1,7 +1,8 @@
 'use strict';
 const grid=document.querySelector('#grid'), count=document.querySelector('#count'), msg=document.querySelector('#message'), more=document.querySelector('#more'), q=document.querySelector('#q'), dateFilter=document.querySelector('#date-filter');
 let all=[],filtered=[],shown=0;const size=18;
-let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading';
+let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null;
+try{reviewRevision=localStorage.getItem('cloudflower-reviews-revision-v1')}catch{}
 const cacheRead=key=>{try{let x=JSON.parse(localStorage.getItem('cloudflower-'+key+'-v1'));return x&&Date.now()-x.at>=0&&Date.now()-x.at<300000&&Array.isArray(x.value)?x.value:null}catch{return null}};
 const cacheWrite=(key,value)=>{try{localStorage.setItem('cloudflower-'+key+'-v1',JSON.stringify({at:Date.now(),value}))}catch{}};
 const savedOptions=cacheRead('options'),savedReviews=cacheRead('reviews');
@@ -11,7 +12,7 @@ const sortLabel=document.createElement('label');sortLabel.htmlFor='sort-order';s
 const sortOrder=document.createElement('select');sortOrder.id='sort-order';sortOrder.innerHTML='<option value="newest">最新更新</option><option value="rating">评分从高到低</option>';
 const sortNotice=document.createElement('span');sortNotice.setAttribute('role','status');
 dateFilter.after(sortLabel,sortOrder,sortNotice);
-function updateSortNotice(){let status=reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价为缓存，更新暂不可用':reviewSyncState==='failed'?'评价暂时无法加载':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status}
+function updateSortNotice(){let status=reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价同步暂时受限':reviewSyncState==='failed'?'评价暂时无法加载':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status}
 
 const norm=x=>(x||'').normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function rebuildScores(){
@@ -29,16 +30,21 @@ function rebuildScores(){
 }
 async function refreshReviews(){
   if(reviewFetchPending)return;reviewFetchPending=true;
-  const get=async path=>{const r=await fetch('https://api.cloudofflower.ccwu.cc/'+path);if(!r.ok)throw Error(path);const x=await r.json();if(!Array.isArray(x[path]))throw Error(path);return x[path]};
+  const get=async path=>{const r=await fetch('https://api.cloudofflower.ccwu.cc/'+path);if(!r.ok)throw Error(path);return r.json()};
   try{
-    const [opts,revs]=await Promise.allSettled([optionsFetched?Promise.resolve(null):get('options'),get('reviews')]);
-    if(opts.status==='fulfilled'&&opts.value){optionNames=opts.value;optionsReady=optionsFetched=true;cacheWrite('options',optionNames)}
-    if(revs.status==='fulfilled'){reviewRows=revs.value;hasReviewData=true;cacheWrite('reviews',reviewRows)}
+    const [opts,version]=await Promise.allSettled([optionsFetched?Promise.resolve(null):get('options'),get('version')]);
+    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;cacheWrite('options',optionNames)}
+    if(version.status!=='fulfilled')throw Error('version');let state=version.value;
+    if(!state.ready||!hasReviewData||reviewRevision!==String(state.revision)){
+      let data=await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;cacheWrite('reviews',reviewRows);
+      if(data.ready){reviewRevision=String(data.revision);try{localStorage.setItem('cloudflower-reviews-revision-v1',reviewRevision)}catch{}}
+      state=data;
+    }
     if(optionsReady&&hasReviewData){reviewReady=true;rebuildScores();if(all.length)filter(true)}
-    reviewSyncState=opts.status==='fulfilled'&&revs.status==='fulfilled'?'fresh':reviewReady?'stale':'failed';updateSortNotice();
-  }finally{reviewFetchPending=false}
+    reviewSyncState=state.stale||!state.ready||opts.status==='rejected'?'stale':'fresh';updateSortNotice();
+  }catch{reviewSyncState=reviewReady?'stale':'failed';updateSortNotice()}finally{reviewFetchPending=false}
 }
-updateSortNotice();refreshReviews();setInterval(refreshReviews,30000);
+updateSortNotice();refreshReviews();setInterval(()=>{if(!document.hidden)refreshReviews()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReviews()});
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e}
 function reviewPanel(data){
   const section=element('section','card-reviews');section.setAttribute('aria-label','本剧最新评价');
