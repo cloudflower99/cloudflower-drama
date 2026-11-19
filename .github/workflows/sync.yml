@@ -69,6 +69,22 @@ jobs:
         run: python -m pip install Pillow==11.3.0
       - name: Optimize poster covers
         run: python optimize_covers.py
+      - name: Embed catalog for fast first display
+        run: |
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('site/data.json').read_text(encoding='utf-8'))
+          if not isinstance(data.get('items'), list) or not data.get('generated'):
+              raise SystemExit('Invalid catalog')
+          payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
+          page = Path('site/index.html')
+          html = page.read_text(encoding='utf-8')
+          if html.count('</body>') != 1:
+              raise SystemExit('Expected exactly one body closing tag')
+          html = html.replace('</body>', '<script type="application/json" id="catalog-bootstrap">' + payload + '</script></body>')
+          page.write_text(html, encoding='utf-8')
+          PYCODE
       - name: Prevent search indexing of HTML pages
         run: |
           python - <<'PYCODE'
