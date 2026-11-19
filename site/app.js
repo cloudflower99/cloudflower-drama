@@ -126,7 +126,7 @@ async function loadCatalog(){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
  try{
   // Revalidate and vary the URL periodically, avoiding stale browser/CDN copies.
-  const r=await fetch('data.json?v='+Math.floor(Date.now()/120000),{cache:'no-store',signal:controller.signal});
+  const r=await fetch('data.json?v='+Math.floor(Date.now()/30000),{cache:'no-store',signal:controller.signal});
   if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();
   if(!Array.isArray(data.items)||!data.generated)throw Error('invalid catalog');
   if(catalogVersion&&data.generated<catalogVersion){catalogStatus.textContent='服务器数据较旧，显示上次同步的内容。';return}
@@ -141,5 +141,5 @@ async function loadCatalog(){
 const catalogStatus=element('span','catalog-status');catalogStatus.setAttribute('role','status');retryCatalog.before(catalogStatus);
 const savedCatalog=cacheObject('catalog');
 if(savedCatalog&&savedCatalog.value.length&&typeof savedCatalog.revision==='string'&&!Number.isNaN(Date.parse(savedCatalog.revision))){applyCatalog(savedCatalog.value,savedCatalog.revision);catalogStatus.textContent='显示上次同步的内容，正在更新…'}
-loadCatalog();setInterval(()=>{if(!document.hidden)loadCatalog()},120000);
+loadCatalog();setInterval(()=>{if(!document.hidden)loadCatalog()},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCatalog()});window.addEventListener('online',loadCatalog);
