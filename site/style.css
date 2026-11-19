@@ -151,11 +151,11 @@ body #grid .card{height:100%}
 body #grid .card h3{margin:0 0 8px}
 body #grid .drama-title-link{display:block;text-decoration:none}
 body #grid .title-main,body #grid .title-en{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
-body #grid .title-main{font-size:16px;line-height:1.4;height:2.8em;font-weight:750;color:var(--text)}
-body #grid .title-en{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:13px;line-height:1.35;height:2.7em;margin-top:3px;color:#7483a5}
+body #grid .title-main{font-size:18px;line-height:1.4;height:2.8em;font-weight:750;color:var(--text)}
+body #grid .title-en{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-style:italic;font-weight:400;font-size:12px;line-height:1.35;height:2.7em;margin-top:3px;color:#7483a5}
 body #grid .card-summary{font-size:13px;line-height:1.5;height:3em;margin:0 0 8px;color:var(--muted);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 body #grid .card-stats{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;min-height:34px}
 body #grid .card-stats .like-button,body #grid .card-stats .rating-live{margin:0}
 .catalog-status{display:block;color:var(--muted);font-size:14px;margin:8px 0}
-@media(max-width:600px){body #grid .title-main{font-size:15px}body #grid .title-en{font-size:12px}body #grid .card-summary{font-size:12px}}
+@media(max-width:600px){body #grid .title-main{font-size:17px}body #grid .title-en{font-size:11px}body #grid .card-summary{font-size:12px}}
 :where(html[data-theme="dark"]) body #grid .title-en{color:#afbddb}
