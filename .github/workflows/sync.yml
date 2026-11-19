@@ -84,6 +84,13 @@ jobs:
               raise SystemExit('Expected exactly one body closing tag')
           html = html.replace('</body>', '<script type="application/json" id="catalog-bootstrap">' + payload + '</script></body>')
           page.write_text(html, encoding='utf-8')
+          page = Path('site/drama.html')
+          html = page.read_text(encoding='utf-8')
+          marker = "<script>\n'use strict';const API="
+          if html.count(marker) != 1:
+              raise SystemExit('Expected exactly one detail script')
+          html = html.replace(marker, '<script type="application/json" id="catalog-bootstrap">' + payload + '</script>' + marker, 1)
+          page.write_text(html, encoding='utf-8')
           PYCODE
       - name: Prevent search indexing of HTML pages
         run: |
