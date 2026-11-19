@@ -193,3 +193,11 @@ body #grid[data-view="list"] .review-head{flex-direction:row;align-items:center}
  body #grid[data-view="list"] .card-summary{font-size:14px}
 }
 :where(html[data-theme="dark"]) body #grid .card .cover.portrait{background:transparent}
+
+/* Keep the English subtitle directly beneath the Chinese title. */
+body #grid .title-main,body #grid .title-en{height:auto}
+body #grid .title-en{margin-top:2px}
+body #grid .card h3{min-height:86px}
+body #grid[data-view="list"] .card h3{min-height:0}
+body #grid[data-view="list"] .title-en{margin-top:2px}
+@media(max-width:600px){body #grid .card h3{min-height:81px}body #grid[data-view="list"] .card h3{min-height:0}}

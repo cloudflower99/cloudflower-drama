@@ -14,11 +14,18 @@
  async function drawPoster(drama){
   let image=drama.image?await loadImage(drama.image):null;
   const portrait=!!image&&image.naturalHeight>image.naturalWidth,extra=portrait?240:0;
-  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1550+extra;const c=canvas.getContext('2d');
-  const bg=c.createLinearGradient(0,0,1080,1550+extra);bg.addColorStop(0,'#edf4ff');bg.addColorStop(1,'#f3efff');c.fillStyle=bg;c.fillRect(0,0,1080,1550+extra);
-  c.fillStyle='#fff';rounded(c,54,48,972,1454+extra,32);
+  const canvas=document.createElement('canvas');canvas.width=1080;const c=canvas.getContext('2d');
+  const [cn,en]=splitTitle(drama.title),posterHeight=760+extra;
+  c.font='bold 49px system-ui, sans-serif';const cnLines=lines(c,cn,884,2);
+  c.font='italic 28px system-ui, sans-serif';const enLines=en?lines(c,en,884,2):[];
+  c.font='28px system-ui, sans-serif';const descriptionLines=lines(c,drama.description||'暂无简介',884,6);
+  const titleY=150+posterHeight+60,titleBottom=titleY+(cnLines.length-1)*62;
+  const enY=titleBottom+46,enBottom=enLines.length?enY+(enLines.length-1)*38:titleBottom;
+  const descriptionY=enBottom+58,descriptionBottom=descriptionY+(descriptionLines.length-1)*43;
+  const ruleY=descriptionBottom+58,footerY=ruleY+48;canvas.height=footerY+65;
+  const bg=c.createLinearGradient(0,0,1080,canvas.height);bg.addColorStop(0,'#edf4ff');bg.addColorStop(1,'#f3efff');c.fillStyle=bg;c.fillRect(0,0,1080,canvas.height);
+  c.fillStyle='#fff';rounded(c,54,48,972,canvas.height-96,32);
   c.fillStyle='#6b83c3';c.font='bold 25px system-ui, sans-serif';c.fillText('☁  在云的背面种花',98,112);c.fillStyle='#9aa8cb';c.textAlign='right';c.font='22px system-ui, sans-serif';c.fillText(drama.date||'剧集分享',982,112);c.textAlign='left';
-  const posterHeight=760+extra;
   if(portrait){
    const scale=Math.min(884/image.naturalWidth,posterHeight/image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale,x=98+(884-w)/2,y=150+(posterHeight-h)/2;
    c.save();roundedPath(c,x,y,w,h,24);c.clip();c.drawImage(image,x,y,w,h);c.restore();
@@ -26,10 +33,10 @@
    c.fillStyle='#f0f3fc';rounded(c,98,150,884,760,24);
    if(image){const scale=Math.min(884/image.naturalWidth,760/image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale;c.drawImage(image,98+(884-w)/2,150+(760-h)/2,w,h)}else{c.fillStyle='#9baacc';c.textAlign='center';c.font='30px system-ui, sans-serif';c.fillText('☁ 暂无海报',540,540);c.textAlign='left'}
   }
-  const [cn,en]=splitTitle(drama.title);let y=968+extra;c.fillStyle='#273552';c.font='bold 49px system-ui, sans-serif';y=drawLines(c,cn,98,y,884,2,62);
-  if(en){c.fillStyle='#7585a8';c.font='italic 28px system-ui, sans-serif';y=drawLines(c,en,98,y+4,884,2,38)}
-  y+=30;c.fillStyle='#5d6f91';c.font='28px system-ui, sans-serif';drawLines(c,drama.description||'暂无简介',98,y,884,3,43);
-  c.fillStyle='#e4eaf7';c.fillRect(98,1392+extra,884,2);c.fillStyle='#7d8fb6';c.font='23px system-ui, sans-serif';c.fillText('在云的背面种花 · 剧集分享',98,1440+extra);c.textAlign='right';c.fillText(location.host,982,1440+extra);
+  c.textAlign='center';c.fillStyle='#273552';c.font='bold 49px system-ui, sans-serif';cnLines.forEach((line,i)=>c.fillText(line,540,titleY+i*62));
+  if(enLines.length){c.fillStyle='#7585a8';c.font='italic 28px system-ui, sans-serif';enLines.forEach((line,i)=>c.fillText(line,540,enY+i*38))}
+  c.textAlign='left';c.fillStyle='#5d6f91';c.font='28px system-ui, sans-serif';descriptionLines.forEach((line,i)=>c.fillText(line,98,descriptionY+i*43));
+  c.fillStyle='#e4eaf7';c.fillRect(98,ruleY,884,2);c.fillStyle='#7d8fb6';c.font='23px system-ui, sans-serif';c.fillText('在云的背面种花 · 剧集分享',98,footerY);c.textAlign='right';c.fillText(location.host,982,footerY);
   return createBlob(canvas);
  }
  make.addEventListener('click',async()=>{
