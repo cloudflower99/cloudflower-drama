@@ -25,13 +25,14 @@ async function readJSON(path){
 reviewRevision=cacheObject('reviews')?.revision??null;
 const savedOptions=cacheRead('options'),savedReviews=cacheRead('reviews');
 if(savedOptions){optionNames=savedOptions;optionsReady=true}if(savedReviews){reviewRows=savedReviews;hasReviewData=true;if(optionsReady){reviewReady=true;reviewSyncState='updating'}}
+let reviewPreviews=new Map();try{const data=JSON.parse(document.querySelector('#review-bootstrap')?.textContent||'{}');if(data&&typeof data==='object'&&!Array.isArray(data))reviewPreviews=new Map(Object.entries(data))}catch{}
 
 const sortLabel=document.createElement('label');sortLabel.htmlFor='sort-order';sortLabel.innerHTML='<svg class="filter-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v15m-3-3 3 3 3-3M17 20V5m-3 3 3-3 3 3"/></svg>排序方式';
 const sortOrder=document.createElement('select');sortOrder.id='sort-order';sortOrder.innerHTML='<option value="newest">最新更新</option><option value="rating">评分从高到低</option>';
 const sortNotice=document.createElement('span');sortNotice.setAttribute('role','status');
 const retryReviews=element('button','inline-retry','重试评价');retryReviews.type='button';retryReviews.hidden=true;retryReviews.addEventListener('click',refreshReviews);
 dateFilter.after(sortLabel,sortOrder,sortNotice,retryReviews);
-function updateSortNotice(){let status=reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价或剧集列表更新暂不可用':reviewSyncState==='failed'?'评价暂时无法加载，正在重试':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status;retryReviews.hidden=!['stale','failed'].includes(reviewSyncState);retryReviews.disabled=reviewFetchPending}
+function updateSortNotice(){let status=reviewSyncState==='loading'&&reviewPreviews.size?'评价为快照，正在更新':reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价或剧集列表更新暂不可用':reviewSyncState==='failed'?reviewPreviews.size?'评价快照，更新暂不可用':'评价暂时无法加载，正在重试':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status;retryReviews.hidden=!['stale','failed'].includes(reviewSyncState);retryReviews.disabled=reviewFetchPending}
 
 const norm=x=>(x||'').normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function rebuildScores(){
@@ -59,11 +60,11 @@ async function refreshReviews(){
   if(reviewFetchPending)return;reviewFetchPending=true;retryReviews.disabled=true;
   const get=readJSON,previousState=reviewSyncState;let changed=false;
   try{
-    const [opts,version]=await Promise.allSettled([optionsFetched&&Date.now()-optionsLastFetch<60000?Promise.resolve(null):get('options'),get('version')]);
+    const [opts,version]=await Promise.allSettled([optionsFetched&&Date.now()-optionsLastFetch<60000?Promise.resolve(null):get('options'),get(hasReviewData?'version':'reviews')]);
     if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;optionsLastFetch=Date.now();cacheWrite('options',optionNames);changed=true}
     let state=version.status==='fulfilled'?version.value:null;
     if(!state||!state.ready||!hasReviewData||reviewRevision!==String(state.revision)){
-      let data=await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;changed=true;
+      let data=Array.isArray(state?.reviews)?state:await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;changed=true;
       reviewRevision=data.ready?String(data.revision):null;cacheWrite('reviews',reviewRows,reviewRevision);
       state=data;
     }
@@ -77,7 +78,7 @@ function dramaUrl(title,option){const q=new URLSearchParams({title});if(option)q
 function reviewPanel(data,title){
   const section=element('section','card-reviews');section.setAttribute('aria-label','本剧最新评价');
   const head=element('div','review-head');head.append(element('strong','', '💬 最新短评'));
-  const link=element('a','review-link',data.reviews.length?'去评价页 ↗':'写第一条评价 ↗');link.textContent=data.reviews.length?'查看全部评价 ↗':'写第一条评价 ↗';link.href=dramaUrl(title,data.option);head.append(link);section.append(head);
+  const hasReviews=data.hasReviews??!!data.reviews.length;const link=element('a','review-link',hasReviews?'去评价页 ↗':'写第一条评价 ↗');link.textContent=hasReviews?'查看全部评价 ↗':'写第一条评价 ↗';link.href=dramaUrl(title,data.option);head.append(link);section.append(head);
   const latest=data.reviews.filter(r=>r.content&&r.content.trim()).slice(0,3);
   if(!latest.length){section.append(element('p','review-empty','还没有短评，欢迎分享你的感受。'));return section}
   for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating)meta.append(element('span','review-stars','★'.repeat(r.rating)+'☆'.repeat(5-r.rating)));if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));if(r.id)row.append(CloudLikes.button('review',r.id));section.append(row)}return section
@@ -93,17 +94,17 @@ function splitTitle(title){
 function append(){
  let cardIndex=0;
  for(const x of filtered.slice(shown,shown+size)){
-  const review=reviewByTitle.get(x.title),url=dramaUrl(x.title,review?.option),card=element('article','card'),posterLink=element('a','poster-link'),cover=element('div','cover');
+  const review=reviewByTitle.get(x.title)||(!reviewReady?reviewPreviews.get(x.title):null),url=dramaUrl(x.title,review?.option),card=element('article','card'),posterLink=element('a','poster-link'),cover=element('div','cover');
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
   if(x.image){const img=document.createElement('img');img.alt=x.title+' 海报';img.loading=shown===0&&cardIndex<2?'eager':'lazy';img.decoding='async';img.addEventListener('load',()=>cover.classList.toggle('portrait',img.naturalHeight>img.naturalWidth));if(shown===0&&cardIndex===0)img.fetchPriority='high';let fallback=!!x.thumbnail&&x.thumbnail!==x.image;img.addEventListener('error',()=>{if(fallback){fallback=false;img.src=x.image}else{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))}});img.src=x.thumbnail||x.image;cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
   const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link');titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');titleLink.title=x.title;const [mainTitle,englishTitle]=splitTitle(x.title);titleLink.append(element('span','title-main',mainTitle),element('span','title-en',englishTitle));heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);
   body.append(element('p','card-summary',(x.description||'暂无简介').replace(/\s+/g,' ').trim()));
   const stats=element('div','card-stats');stats.append(CloudLikes.button('drama',x.title));
-  if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
+  if(review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
   const links=element('div','card-links');for(const [name,raw] of Object.entries(x.links||{})){try{const dest=new URL(raw);if(dest.protocol!=='https:')continue;const link=element('a','',name+' ↗');link.href=dest.href;link.target='_blank';link.rel='noopener noreferrer';links.append(link)}catch{}}if(links.childElementCount)body.append(links);
 
-  if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?(optionsFetched?'暂未匹配评价入口':'评价信息更新中…'):reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
+  if(review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?(optionsFetched?'暂未匹配评价入口':'评价信息更新中…'):reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card);cardIndex++
  }
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
