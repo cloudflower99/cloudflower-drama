@@ -137,3 +137,9 @@ body #grid .review-empty{font-size:12px;line-height:1.5;margin:10px 0 0}
 @media(max-width:900px){body #grid.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}}
 @media(max-width:600px){body #grid.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}body #grid .card{padding:8px;border-radius:14px}body #grid .cardbody{padding:10px 3px 3px}body #grid .card h3{font-size:14px;line-height:1.42}body #grid .review-head{align-items:flex-start;flex-direction:column;gap:0}body #grid .review-link{min-height:28px}body #grid .card .rating-live{font-size:11px}.back-to-top{right:14px;bottom:16px}}
 @media(prefers-color-scheme:dark){body #grid .card .cover{background:#30384e}.back-to-top{background:#293247;color:#c4d3ff;border-color:#465470}.back-to-top:hover{background:#36425c}}
+
+/* Loading and accessibility refinements */
+.inline-retry{min-height:38px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--accent);font:inherit;font-size:13px;cursor:pointer}
+.inline-retry[hidden]{display:none}.inline-retry:disabled{opacity:.55;cursor:wait}.inline-retry:hover:not(:disabled){background:var(--soft)}
+.poster-link:focus-visible,.drama-title-link:focus-visible,.inline-retry:focus-visible,.back-to-top:focus-visible{outline:3px solid #7896e4;outline-offset:3px}
+@media(max-width:600px){body .date-controls .inline-retry{grid-column:1 / -1;justify-self:start}body #grid .card h3{word-break:normal;overflow-wrap:anywhere}body #grid .review-meta{line-height:1.5}}

@@ -22,38 +22,47 @@ if(savedOptions){optionNames=savedOptions;optionsReady=true}if(savedReviews){rev
 const sortLabel=document.createElement('label');sortLabel.htmlFor='sort-order';sortLabel.textContent='↕️ 排序方式';
 const sortOrder=document.createElement('select');sortOrder.id='sort-order';sortOrder.innerHTML='<option value="newest">最新更新</option><option value="rating">评分从高到低</option>';
 const sortNotice=document.createElement('span');sortNotice.setAttribute('role','status');
-dateFilter.after(sortLabel,sortOrder,sortNotice);
-function updateSortNotice(){let status=reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价或剧集列表更新暂不可用':reviewSyncState==='failed'?'评价暂时无法加载，正在重试':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status}
+const retryReviews=element('button','inline-retry','重试评价');retryReviews.type='button';retryReviews.hidden=true;retryReviews.addEventListener('click',refreshReviews);
+dateFilter.after(sortLabel,sortOrder,sortNotice,retryReviews);
+function updateSortNotice(){let status=reviewSyncState==='updating'?'评价为缓存，正在更新':reviewSyncState==='stale'?'评价或剧集列表更新暂不可用':reviewSyncState==='failed'?'评价暂时无法加载，正在重试':' ';sortNotice.textContent=(sortOrder.value==='rating'&&reviewReady?'未评分靠后 · ':'')+status;retryReviews.hidden=!['stale','failed'].includes(reviewSyncState);retryReviews.disabled=reviewFetchPending}
 
 const norm=x=>(x||'').normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function rebuildScores(){
-  const titles=all.map(x=>x.title), ts=titles.map(norm), opts=optionNames.map(norm), grouped=new Map();
+  const titles=all.map(x=>x.title), ts=titles.map(norm), opts=optionNames.map(norm), grouped=new Map(), exact=new Map(), prefixes=new Map();
   for(const r of reviewRows){if(!grouped.has(r.drama))grouped.set(r.drama,[]);grouped.get(r.drama).push(r)}
+  // Compute prefix uniqueness once per option, not repeatedly for every title.
+  for(let j=0;j<opts.length;j++){
+    const v=opts[j];if(!exact.has(v))exact.set(v,[]);exact.get(v).push(j);
+    if(v.length<4)continue;
+    let match=-1,count=0;for(let i=0;i<ts.length;i++)if(ts[i].startsWith(v)){match=i;if(++count>1)break}
+    if(count!==1)continue;
+    let optionCount=0;for(const o of opts)if(o.startsWith(v)&&++optionCount>1)break;
+    if(optionCount===1){if(!prefixes.has(match))prefixes.set(match,[]);prefixes.get(match).push(j)}
+  }
   reviewByTitle.clear();
   for(let i=0;i<titles.length;i++){
-    const n=ts[i],exact=opts.map((v,j)=>v===n?j:-1).filter(j=>j>=0);
-    const possible=exact.length?exact:opts.map((v,j)=>v.length>=4&&n.startsWith(v)&&ts.filter(t=>t.startsWith(v)).length===1&&opts.filter(t=>t.startsWith(v)).length===1?j:-1).filter(j=>j>=0);
+    const direct=exact.get(ts[i])||[],possible=direct.length?direct:(prefixes.get(i)||[]);
     if(possible.length!==1)continue;
     const option=optionNames[possible[0]],reviews=(grouped.get(option)||[]).slice().sort((a,b)=>(b.time||'').localeCompare(a.time||''));
-    const rated=reviews.filter(r=>r.rating>=1&&r.rating<=5);
-    reviewByTitle.set(titles[i],{option,reviews,count:rated.length,score:rated.length?rated.reduce((sum,r)=>sum+r.rating,0)/rated.length:null,average:rated.length?(rated.reduce((sum,r)=>sum+r.rating,0)/rated.length).toFixed(1):null});
+    const rated=reviews.filter(r=>r.rating>=1&&r.rating<=5),total=rated.reduce((sum,r)=>sum+r.rating,0);
+    reviewByTitle.set(titles[i],{option,reviews,count:rated.length,score:rated.length?total/rated.length:null,average:rated.length?(total/rated.length).toFixed(1):null});
   }
 }
 async function refreshReviews(){
-  if(reviewFetchPending)return;reviewFetchPending=true;
-  const get=readJSON;
+  if(reviewFetchPending)return;reviewFetchPending=true;retryReviews.disabled=true;
+  const get=readJSON,previousState=reviewSyncState;let changed=false;
   try{
     const [opts,version]=await Promise.allSettled([optionsFetched?Promise.resolve(null):get('options'),get('version')]);
-    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;cacheWrite('options',optionNames)}
+    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;cacheWrite('options',optionNames);changed=true}
     let state=version.status==='fulfilled'?version.value:null;
     if(!state||!state.ready||!hasReviewData||reviewRevision!==String(state.revision)){
-      let data=await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;
+      let data=await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;changed=true;
       reviewRevision=data.ready?String(data.revision):null;cacheWrite('reviews',reviewRows,reviewRevision);
       state=data;
     }
     reviewSyncState=state.stale||!state.ready||opts.status==='rejected'?'stale':'fresh';
-    if(optionsReady&&hasReviewData){reviewReady=true;rebuildScores()}if(all.length)filter(true);updateSortNotice();
-  }catch{if(optionsReady&&hasReviewData){reviewReady=true;rebuildScores()}reviewSyncState=reviewReady?'stale':'failed';if(all.length)filter(true);updateSortNotice()}finally{reviewFetchPending=false}
+    if(optionsReady&&hasReviewData){reviewReady=true;if(changed)rebuildScores()}if(all.length&&(changed||previousState!==reviewSyncState))filter(true);
+  }catch{if(optionsReady&&hasReviewData){reviewReady=true;if(changed)rebuildScores()}reviewSyncState=reviewReady?'stale':'failed';if(all.length&&(changed||previousState!==reviewSyncState))filter(true)}finally{reviewFetchPending=false;updateSortNotice()}
 }
 updateSortNotice();refreshReviews();setInterval(()=>{if(!document.hidden)refreshReviews()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReviews()});window.addEventListener('online',refreshReviews);
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e}
@@ -71,15 +80,17 @@ function append(){
  for(const x of filtered.slice(shown,shown+size)){
   const review=reviewByTitle.get(x.title),url=dramaUrl(x.title,review?.option),card=element('article','card'),posterLink=element('a','poster-link'),cover=element('div','cover');
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
-  if(x.image){const img=document.createElement('img');img.src=x.image;img.alt=x.title+' 海报';img.loading='lazy';img.addEventListener('error',()=>{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))},{once:true});cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
+  if(x.image){const img=document.createElement('img');img.src=x.image;img.alt=x.title+' 海报';img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))},{once:true});cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
   const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link',x.title);titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);
   if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';body.append(element('p','rating rating-live',score))}
-  if(reviewReady&&review)body.append(reviewPanel(review,x.title));else if(!reviewReady)body.append(element('p','review-empty',reviewSyncState==='failed'?'短评暂时无法加载，正在重试。':'短评正在加载…'));
+  if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card)
  }
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
 }
 function filter(preserve=false){let keep=preserve?shown:0,s=q.value.trim().toLocaleLowerCase();filtered=all.filter(x=>(!s||x.title.toLocaleLowerCase().includes(s))&&(s||!dateFilter||dateFilter.value==='all'||(x.date||'undated')===dateFilter.value));if(sortOrder.value==='rating'&&reviewReady)filtered.sort((a,b)=>{let x=reviewByTitle.get(a.title)?.score,y=reviewByTitle.get(b.title)?.score;return x==null?(y==null?0:1):y==null?-1:y-x});render(keep)}
 document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});
-fetch('data.json').then(r=>{if(!r.ok)throw Error('load');return r.json()}).then(data=>{all=data.items;rebuildScores();const dates=[...new Set(all.map(x=>x.date||'undated'))];dates.sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));if(dateFilter){for(const date of dates){let opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}dateFilter.value=dates[0]||'all'};document.querySelector('#updated').textContent='最近同步：'+new Date(data.generated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});filter()}).catch(()=>{count.textContent='';msg.hidden=false;msg.textContent='目录暂时无法加载，请稍后重试。'});
+const retryCatalog=element('button','inline-retry catalog-retry','重试加载目录');retryCatalog.type='button';retryCatalog.hidden=true;msg.after(retryCatalog);retryCatalog.addEventListener('click',loadCatalog);
+function loadCatalog(){retryCatalog.hidden=true;msg.hidden=false;msg.textContent='目录正在加载…';fetch('data.json').then(r=>{if(!r.ok)throw Error('load');return r.json()}).then(data=>{all=data.items;rebuildScores();const dates=[...new Set(all.map(x=>x.date||'undated'))];dates.sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));if(dateFilter){for(const date of dates){let opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}dateFilter.value=dates[0]||'all'};document.querySelector('#updated').textContent='最近同步：'+new Date(data.generated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});filter()}).catch(()=>{count.textContent='';msg.hidden=false;msg.textContent='目录暂时无法加载，请检查网络后重试。';retryCatalog.hidden=false});}
+loadCatalog();
