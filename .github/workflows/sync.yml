@@ -80,6 +80,52 @@ jobs:
           payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
           page = Path('site/index.html')
           html = page.read_text(encoding='utf-8')
+          # Render the newest date into HTML so cards paint before JavaScript loads.
+          import html as html_lib, re
+          from urllib.parse import urlencode, urlsplit
+          esc = lambda value: html_lib.escape(str(value or ''), quote=True)
+          def scheme(value):
+              try: return urlsplit(str(value)).scheme
+              except ValueError: return 'invalid'
+          dates = sorted({str(x.get('date') or 'undated') for x in data['items']} - {'undated'}, reverse=True)
+          if any(not x.get('date') for x in data['items']):
+              dates.append('undated')
+          selected = dates[0] if dates else 'all'
+          visible = [x for x in data['items'] if selected == 'all' or (x.get('date') or 'undated') == selected]
+          options = '<option value="all">全部日期</option>' + ''.join('<option value="' + esc(d) + '"' + (' selected' if d == selected else '') + '>' + ('日期未注明' if d == 'undated' else esc(d)) + '</option>' for d in dates)
+          cards = []
+          for i, x in enumerate(visible[:18]):
+              title = str(x.get('title') or '')
+              chinese = list(re.finditer(r'[\u3400-\u9fff]', title))
+              main, english = title, ''
+              if chinese:
+                  last = chinese[-1].end()
+                  boundary = re.search(r'\s+(?=[A-Za-z])', title[last:])
+                  if boundary:
+                      cut = last + boundary.start()
+                      main, english = title[:cut].strip(), title[cut:].strip()
+              href = 'drama.html?' + urlencode({'title': title})
+              image = str(x.get('thumbnail') or x.get('image') or '')
+              image_scheme = scheme(image)
+              if image and (image_scheme == 'https' or (not image_scheme and not image.startswith('//'))):
+                  cover = '<img src="' + esc(image) + '" alt="' + esc(title + ' 海报') + '" decoding="async" loading="' + ('eager' if i < 2 else 'lazy') + '"' + (' fetchpriority="high"' if i == 0 else '') + ' onload="this.parentElement.classList.toggle(&quot;portrait&quot;,this.naturalHeight>this.naturalWidth)">'
+              else:
+                  cover = '<span class="poster-empty">☁ 暂无海报</span>'
+              links = []
+              for name, dest in (x.get('links') or {}).items():
+                  if scheme(dest) == 'https':
+                      links.append('<a href="' + esc(dest) + '" target="_blank" rel="noopener noreferrer">' + esc(name) + ' ↗</a>')
+              summary = re.sub(r'\s+', ' ', str(x.get('description') or '暂无简介')).strip()
+              cards.append('<article class="card"><a class="poster-link" href="' + esc(href) + '" aria-label="' + esc('查看 ' + title + ' 的详情和评价') + '"><div class="cover">' + cover + '</div></a><div class="cardbody"><p class="date">' + esc(x.get('date') or '日期未注明') + '</p><h3><a class="drama-title-link" href="' + esc(href) + '"><span class="title-main">' + esc(main) + '</span><span class="title-en">' + esc(english) + '</span></a></h3><p class="card-summary">' + esc(summary) + '</p>' + ('<div class="card-links">' + ''.join(links) + '</div>' if links else '') + '</div></article>')
+          def replace_once(old, new):
+              global html
+              if html.count(old) != 1:
+                  raise SystemExit('Missing unique homepage placeholder')
+              html = html.replace(old, new, 1)
+          replace_once('<select id="date-filter"><option value="all">全部日期</option></select>', '<select id="date-filter">' + options + '</select>')
+          replace_once('id="count" aria-live="polite">正在加载…</p>', 'id="count" aria-live="polite">' + str(len(visible)) + ' 部剧集</p>')
+          layout = "<script>try{document.currentScript.parentElement.dataset.view=localStorage.getItem('cloudflower-catalog-view-v1')||(matchMedia('(max-width:600px)').matches?'list':'grid')}catch{document.currentScript.parentElement.dataset.view=matchMedia('(max-width:600px)').matches?'list':'grid'}</script>"
+          replace_once('<div id="grid" class="grid"></div>', '<div id="grid" class="grid">' + layout + ''.join(cards) + '</div>')
           if html.count('</body>') != 1:
               raise SystemExit('Expected exactly one body closing tag')
           html = html.replace('</body>', '<script type="application/json" id="catalog-bootstrap">' + payload + '</script></body>')
