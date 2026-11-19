@@ -1,6 +1,12 @@
 'use strict';
 const grid=document.querySelector('#grid'), count=document.querySelector('#count'), msg=document.querySelector('#message'), more=document.querySelector('#more'), q=document.querySelector('#q'), dateFilter=document.querySelector('#date-filter');
 let all=[],filtered=[],shown=0;const size=18;
+const mobileView=matchMedia('(max-width:600px)'),viewList=document.querySelector('#view-list'),viewGrid=document.querySelector('#view-grid'),viewStorageKey='cloudflower-catalog-view-v1';
+let savedView=null;try{savedView=localStorage.getItem(viewStorageKey)}catch{}if(!['list','grid'].includes(savedView))savedView=null;
+function setView(mode,persist=false){grid.dataset.view=mode;viewList.setAttribute('aria-pressed',String(mode==='list'));viewGrid.setAttribute('aria-pressed',String(mode==='grid'));if(persist){savedView=mode;try{localStorage.setItem(viewStorageKey,mode)}catch{}}}
+function autoView(){if(!savedView)setView(mobileView.matches?'list':'grid')}
+viewList.addEventListener('click',()=>setView('list',true));viewGrid.addEventListener('click',()=>setView('grid',true));if(mobileView.addEventListener)mobileView.addEventListener('change',autoView);else if(mobileView.addListener)mobileView.addListener(autoView);setView(savedView||(mobileView.matches?'list':'grid'));
+
 let dateManuallySelected=false,catalogLoaded=false,catalogVersion=null,catalogPending=false;
 let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null;
 // Keep the last successful public snapshot for offline fallback. Its revision
@@ -89,12 +95,14 @@ function append(){
  for(const x of filtered.slice(shown,shown+size)){
   const review=reviewByTitle.get(x.title),url=dramaUrl(x.title,review?.option),card=element('article','card'),posterLink=element('a','poster-link'),cover=element('div','cover');
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
-  if(x.image){const img=document.createElement('img');img.alt=x.title+' 海报';img.loading=shown===0&&cardIndex<2?'eager':'lazy';img.decoding='async';if(shown===0&&cardIndex===0)img.fetchPriority='high';let fallback=!!x.thumbnail&&x.thumbnail!==x.image;img.addEventListener('error',()=>{if(fallback){fallback=false;img.src=x.image}else{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))}});img.src=x.thumbnail||x.image;cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
+  if(x.image){const img=document.createElement('img');img.alt=x.title+' 海报';img.loading=shown===0&&cardIndex<2?'eager':'lazy';img.decoding='async';img.addEventListener('load',()=>cover.classList.toggle('portrait',img.naturalHeight>img.naturalWidth));if(shown===0&&cardIndex===0)img.fetchPriority='high';let fallback=!!x.thumbnail&&x.thumbnail!==x.image;img.addEventListener('error',()=>{if(fallback){fallback=false;img.src=x.image}else{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))}});img.src=x.thumbnail||x.image;cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
   const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link');titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');titleLink.title=x.title;const [mainTitle,englishTitle]=splitTitle(x.title);titleLink.append(element('span','title-main',mainTitle),element('span','title-en',englishTitle));heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);
   body.append(element('p','card-summary',(x.description||'暂无简介').replace(/\s+/g,' ').trim()));
   const stats=element('div','card-stats');stats.append(CloudLikes.button('drama',x.title));
   if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
+  const links=element('div','card-links');for(const [name,raw] of Object.entries(x.links||{})){try{const dest=new URL(raw);if(dest.protocol!=='https:')continue;const link=element('a','',name+' ↗');link.href=dest.href;link.target='_blank';link.rel='noopener noreferrer';links.append(link)}catch{}}if(links.childElementCount)body.append(links);
+
   if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card);cardIndex++
  }

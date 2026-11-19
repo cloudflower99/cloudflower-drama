@@ -159,3 +159,37 @@ body #grid .card-stats .like-button,body #grid .card-stats .rating-live{margin:0
 .catalog-status{display:block;color:var(--muted);font-size:14px;margin:8px 0}
 @media(max-width:600px){body #grid .title-main{font-size:17px}body #grid .title-en{font-size:11px}body #grid .card-summary{font-size:12px}}
 :where(html[data-theme="dark"]) body #grid .title-en{color:#afbddb}
+
+/* Selectable catalog layouts; portrait art is rounded without cropping. */
+.view-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin:-10px 0 16px;color:var(--muted);font-size:13px}
+.view-switch{display:inline-flex;padding:3px;border:1px solid var(--line);border-radius:11px;background:var(--surface);gap:2px}
+.view-switch button{border:0;border-radius:8px;background:transparent;color:var(--muted);font:600 13px system-ui,sans-serif;padding:6px 10px;min-height:34px;cursor:pointer}
+.view-switch button[aria-pressed="true"]{background:var(--soft);color:var(--accent)}
+.view-switch button:focus-visible{outline:3px solid #7896e4;outline-offset:2px}
+body #grid .card .cover.portrait{display:block;background:transparent;height:auto;aspect-ratio:auto;overflow:visible}
+body #grid .cover.portrait img{display:block;width:100%;height:auto;max-width:100%;max-height:none;min-height:0;border-radius:11px}
+body #grid .card-links{display:none}
+body #grid.grid[data-view="list"]{grid-template-columns:minmax(0,1fr);gap:16px}
+body #grid[data-view="list"] .card{flex-direction:row;gap:22px;padding:18px;align-items:flex-start}
+body #grid[data-view="list"] .poster-link{flex:0 0 200px;width:200px}
+body #grid[data-view="list"] .card .cover{width:100%;height:300px;aspect-ratio:auto}
+body #grid[data-view="list"] .card .cover.portrait{height:auto;aspect-ratio:auto}
+body #grid[data-view="list"] .cardbody{padding:0;flex:1}
+body #grid[data-view="list"] .title-main,body #grid[data-view="list"] .title-en{height:auto;display:block;overflow:visible}
+body #grid[data-view="list"] .title-main{font-size:20px}
+body #grid[data-view="list"] .title-en{font-size:13px;margin-top:5px}
+body #grid[data-view="list"] .card-summary{font-size:14px;height:auto;-webkit-line-clamp:3;line-height:1.55;margin:9px 0}
+body #grid[data-view="list"] .card-links{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 0}
+body #grid[data-view="list"] .card-links a{color:var(--accent);background:var(--soft);padding:7px 10px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;min-height:36px}
+body #grid[data-view="list"] .review-head{flex-direction:row;align-items:center}
+@media(max-width:600px){
+ .view-controls{justify-content:space-between;margin:0 0 16px}
+ body #grid[data-view="list"] .card{flex-direction:column;gap:0;padding:15px}
+ body #grid[data-view="list"] .poster-link{width:100%;flex:none}
+ body #grid[data-view="list"] .card .cover{height:320px;max-width:280px;margin:auto}
+ body #grid[data-view="list"] .card .cover.portrait{height:auto;max-width:none}
+ body #grid[data-view="list"] .cardbody{padding:14px 2px 2px}
+ body #grid[data-view="list"] .title-main{font-size:19px}
+ body #grid[data-view="list"] .card-summary{font-size:14px}
+}
+:where(html[data-theme="dark"]) body #grid .card .cover.portrait{background:transparent}
