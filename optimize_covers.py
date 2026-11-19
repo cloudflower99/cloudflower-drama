@@ -66,6 +66,42 @@ def atomic_json(path, obj):
 
 replace_paths(data)
 replace_paths(manifest)
+# Small poster-wall thumbnails are generated in the existing cached covers folder.
+# The detail page keeps the full optimized image. Invalid or larger thumbnails
+# are ignored and the browser falls back to the original image.
+thumb_count = thumb_saved = 0
+for entry in data.get('items', []):
+    entry.pop('thumbnail', None)
+    source = entry.get('image', '')
+    relative = pathlib.PurePosixPath(source)
+    if len(relative.parts) != 2 or relative.parts[0] != 'covers':
+        continue
+    path = site / relative
+    if not path.is_file():
+        continue
+    target = path.with_name(path.name + '.thumb.webp')
+    tmp = target.with_name(target.name + '.tmp')
+    try:
+        if not target.is_file() or target.stat().st_mtime_ns < path.stat().st_mtime_ns:
+            with Image.open(path) as img:
+                if getattr(img, 'is_animated', False):
+                    continue
+                img = ImageOps.exif_transpose(img)
+                img.thumbnail((360, 540), Image.Resampling.LANCZOS)
+                if img.mode not in ('RGB', 'RGBA'):
+                    img = img.convert('RGBA' if 'transparency' in img.info or 'A' in img.getbands() else 'RGB')
+                img.save(tmp, format='WEBP', quality=70, method=4)
+            with Image.open(tmp) as check:
+                check.verify()
+            os.replace(tmp, target)
+        if target.stat().st_size < path.stat().st_size:
+            entry['thumbnail'] = 'covers/' + target.name
+            thumb_count += 1
+            thumb_saved += path.stat().st_size - target.stat().st_size
+    except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+        tmp.unlink(missing_ok=True)
+        print('Keeping full-size poster:', relative.name, type(exc).__name__, flush=True)
+print(f'Poster thumbnails: {thumb_count}, saved {thumb_saved} bytes per full catalog.', flush=True)
 atomic_json(data_path, data)
 atomic_json(manifest_path, manifest)
 # Keep original paths available to browsers holding an older cached data.json.
