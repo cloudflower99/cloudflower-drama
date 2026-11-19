@@ -26,7 +26,7 @@ reviewRevision=cacheObject('reviews')?.revision??null;
 const savedOptions=cacheRead('options'),savedReviews=cacheRead('reviews');
 if(savedOptions){optionNames=savedOptions;optionsReady=true}if(savedReviews){reviewRows=savedReviews;hasReviewData=true;if(optionsReady){reviewReady=true;reviewSyncState='updating'}}
 
-const sortLabel=document.createElement('label');sortLabel.htmlFor='sort-order';sortLabel.textContent='↕️ 排序方式';
+const sortLabel=document.createElement('label');sortLabel.htmlFor='sort-order';sortLabel.innerHTML='<svg class="filter-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v15m-3-3 3 3 3-3M17 20V5m-3 3 3-3 3 3"/></svg>排序方式';
 const sortOrder=document.createElement('select');sortOrder.id='sort-order';sortOrder.innerHTML='<option value="newest">最新更新</option><option value="rating">评分从高到低</option>';
 const sortNotice=document.createElement('span');sortNotice.setAttribute('role','status');
 const retryReviews=element('button','inline-retry','重试评价');retryReviews.type='button';retryReviews.hidden=true;retryReviews.addEventListener('click',refreshReviews);
