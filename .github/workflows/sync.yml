@@ -93,6 +93,44 @@ jobs:
           selected = dates[0] if dates else 'all'
           visible = [x for x in data['items'] if selected == 'all' or (x.get('date') or 'undated') == selected]
           options = '<option value="all">全部日期</option>' + ''.join('<option value="' + esc(d) + '"' + (' selected' if d == selected else '') + '>' + ('日期未注明' if d == 'undated' else esc(d)) + '</option>' for d in dates)
+          # Public review snapshots are optional; failure must not block publishing.
+          from urllib.request import Request, urlopen
+          from concurrent.futures import ThreadPoolExecutor
+          import unicodedata
+          def public_json(path):
+              req = Request('https://api.cloudofflower.ccwu.cc/' + path, headers={'User-Agent': 'cloudflower-site-build'})
+              with urlopen(req, timeout=6) as response:
+                  body = response.read(8 * 1024 * 1024 + 1)
+              if len(body) > 8 * 1024 * 1024: raise ValueError('response too large')
+              return json.loads(body)
+          def normalized(value):
+              return ''.join(c for c in unicodedata.normalize('NFKC', str(value)).lower() if not c.isspace() and unicodedata.category(c)[0] not in ('P', 'S'))
+          previews = {}
+          try:
+              with ThreadPoolExecutor(max_workers=2) as pool:
+                  future_options = pool.submit(public_json, 'options')
+                  future_reviews = pool.submit(public_json, 'reviews')
+                  option_data, review_data = future_options.result(), future_reviews.result()
+              if not isinstance(option_data.get('options'), list) or not isinstance(review_data.get('reviews'), list) or not review_data.get('ready') or review_data.get('stale'):
+                  raise ValueError('review snapshot unavailable')
+              name_index = {}
+              for name in option_data['options']:
+                  if isinstance(name, str): name_index.setdefault(normalized(name), []).append(name)
+              groups = {}
+              for row in review_data['reviews']:
+                  if isinstance(row, dict) and isinstance(row.get('drama'), str): groups.setdefault(row['drama'], []).append(row)
+              for item in visible[:18]:
+                  title = str(item.get('title') or '')
+                  matches = name_index.get(normalized(title), [])
+                  if len(matches) != 1: continue
+                  option = matches[0]
+                  rows = sorted(groups.get(option, []), key=lambda r: str(r.get('time') or ''), reverse=True)
+                  ratings = [r['rating'] for r in rows if type(r.get('rating')) in (int, float) and 1 <= r['rating'] <= 5]
+                  latest = [{k: r.get(k) for k in ('id','author','content','rating','time')} for r in rows if isinstance(r.get('content'), str) and r['content'].strip()][:3]
+                  previews[title] = {'option': option, 'reviews': latest, 'hasReviews': bool(rows), 'count': len(ratings), 'score': sum(ratings) / len(ratings) if ratings else None, 'average': format(sum(ratings) / len(ratings), '.1f') if ratings else None}
+          except Exception as exc:
+              previews = {}
+              print('Review preview skipped:', type(exc).__name__)
           cards = []
           for i, x in enumerate(visible[:18]):
               title = str(x.get('title') or '')
@@ -115,8 +153,23 @@ jobs:
               for name, dest in (x.get('links') or {}).items():
                   if scheme(dest) == 'https':
                       links.append('<a href="' + esc(dest) + '" target="_blank" rel="noopener noreferrer">' + esc(name) + ' ↗</a>')
+              review = previews.get(title)
+              review_html = stats_html = ''
+              if review:
+                  review_url = 'drama.html?' + urlencode({'title': title, 'drama': review['option']})
+                  score = ('★ ' + review['average'] + ' / 5 · ' + str(review['count']) + ' 条评分') if review['average'] else '☆ 暂无评分'
+                  stats_html = '<div class="card-stats"><p class="rating rating-live">' + esc(score) + '</p></div>'
+                  snippets = []
+                  for r in review['reviews']:
+                      rating = r.get('rating')
+                      stars = '★' * int(rating) + '☆' * (5 - int(rating)) if type(rating) in (int,float) and 1 <= rating <= 5 else ''
+                      content = r['content'].strip()
+                      if len(content) > 120: content = content[:120] + '…'
+                      snippets.append('<div class="review-snippet"><div class="review-meta"><span class="review-author">' + esc(r.get('author') or '匿名观众') + '</span>' + ('<span class="review-stars">' + stars + '</span>' if stars else '') + '</div><p class="review-text">' + esc(content) + '</p></div>')
+                  label = '查看全部评价 ↗' if review['hasReviews'] else '写第一条评价 ↗'
+                  review_html = '<section class="card-reviews" aria-label="本剧最新评价"><div class="review-head"><strong>💬 最新短评 · 快照</strong><a class="review-link" href="' + esc(review_url) + '">' + label + '</a></div>' + (''.join(snippets) if snippets else '<p class="review-empty">还没有短评，欢迎分享你的感受。</p>') + '</section>'
               summary = re.sub(r'\s+', ' ', str(x.get('description') or '暂无简介')).strip()
-              cards.append('<article class="card"><a class="poster-link" href="' + esc(href) + '" aria-label="' + esc('查看 ' + title + ' 的详情和评价') + '"><div class="cover">' + cover + '</div></a><div class="cardbody"><p class="date">' + esc(x.get('date') or '日期未注明') + '</p><h3><a class="drama-title-link" href="' + esc(href) + '"><span class="title-main">' + esc(main) + '</span><span class="title-en">' + esc(english) + '</span></a></h3><p class="card-summary">' + esc(summary) + '</p>' + ('<div class="card-links">' + ''.join(links) + '</div>' if links else '') + '</div></article>')
+              cards.append('<article class="card"><a class="poster-link" href="' + esc(href) + '" aria-label="' + esc('查看 ' + title + ' 的详情和评价') + '"><div class="cover">' + cover + '</div></a><div class="cardbody"><p class="date">' + esc(x.get('date') or '日期未注明') + '</p><h3><a class="drama-title-link" href="' + esc(href) + '"><span class="title-main">' + esc(main) + '</span><span class="title-en">' + esc(english) + '</span></a></h3><p class="card-summary">' + esc(summary) + '</p>' + stats_html + ('<div class="card-links">' + ''.join(links) + '</div>' if links else '') + review_html + '</div></article>')
           def replace_once(old, new):
               global html
               if html.count(old) != 1:
@@ -128,7 +181,9 @@ jobs:
           replace_once('<div id="grid" class="grid"></div>', '<div id="grid" class="grid">' + layout + ''.join(cards) + '</div>')
           if html.count('</body>') != 1:
               raise SystemExit('Expected exactly one body closing tag')
-          html = html.replace('</body>', '<script type="application/json" id="catalog-bootstrap">' + payload + '</script></body>')
+          review_payload = json.dumps(previews, ensure_ascii=False, separators=(',', ':')).replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
+          html = html.replace('</head>', '<link rel="preconnect" href="https://api.cloudofflower.ccwu.cc" crossorigin></head>', 1)
+          html = html.replace('</body>', '<script type="application/json" id="catalog-bootstrap">' + payload + '</script><script type="application/json" id="review-bootstrap">' + review_payload + '</script></body>')
           page.write_text(html, encoding='utf-8')
           page = Path('site/drama.html')
           html = page.read_text(encoding='utf-8')
