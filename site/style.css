@@ -201,3 +201,16 @@ body #grid .card h3{min-height:86px}
 body #grid[data-view="list"] .card h3{min-height:0}
 body #grid[data-view="list"] .title-en{margin-top:2px}
 @media(max-width:600px){body #grid .card h3{min-height:81px}body #grid[data-view="list"] .card h3{min-height:0}}
+
+/* Refined catalog filters and smaller mobile posters. */
+body .date-controls label{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+body .date-controls .filter-icon{width:18px;height:18px;flex:none;color:var(--accent)}
+body .date-controls select{appearance:none;-webkit-appearance:none;min-height:44px;padding:9px 38px 9px 13px;font-size:14px;font-weight:600;line-height:1.4;border:1px solid #cbd6ec;border-radius:10px;background-color:var(--surface);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%237082b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+body .date-controls select:hover{border-color:#9daed5}
+body .date-controls select:focus-visible{outline:3px solid #7896e4;outline-offset:2px}
+@media(max-width:600px){
+ body #grid[data-view="list"] .poster-link{width:min(160px,100%);align-self:center}
+ body #grid[data-view="list"] .card .cover{width:100%;height:220px;max-width:160px}
+ body #grid[data-view="list"] .card .cover.portrait{width:100%;height:auto;max-width:160px}
+ body #grid[data-view="list"] .cover.portrait img{width:auto;max-width:100%;max-height:240px;margin:auto;object-fit:contain}
+}
