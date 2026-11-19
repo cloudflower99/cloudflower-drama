@@ -111,6 +111,15 @@ function append(){
 function filter(preserve=false){let keep=preserve?shown:0,s=q.value.trim().toLocaleLowerCase();filtered=all.filter(x=>(!s||x.title.toLocaleLowerCase().includes(s))&&(s||!dateFilter||dateFilter.value==='all'||(x.date||'undated')===dateFilter.value));if(sortOrder.value==='rating'&&reviewReady)filtered.sort((a,b)=>{let x=reviewByTitle.get(a.title)?.score,y=reviewByTitle.get(b.title)?.score;return x==null?(y==null?0:1):y==null?-1:y-x});render(keep)}
 document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{dateManuallySelected=true;q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});
 const retryCatalog=element('button','inline-retry catalog-retry','重试加载目录');retryCatalog.type='button';retryCatalog.hidden=true;msg.after(retryCatalog);retryCatalog.addEventListener('click',loadCatalog);
+function applyCatalog(items,version){
+  const previousDate=dateFilter.value;all=items;catalogVersion=version;catalogLoaded=true;rebuildScores();
+  const dates=[...new Set(all.map(x=>x.date||'undated'))].sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));
+  dateFilter.replaceChildren();const allDates=element('option','','全部日期');allDates.value='all';dateFilter.append(allDates);
+  for(const date of dates){const opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}
+  dateFilter.value=dateManuallySelected&&(previousDate==='all'||dates.includes(previousDate))?previousDate:(dates[0]||'all');
+  document.querySelector('#updated').textContent='最近同步：'+new Date(version).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+  filter(true);
+}
 async function loadCatalog(){
  if(catalogPending)return;catalogPending=true;retryCatalog.hidden=true;
  if(!catalogLoaded){msg.hidden=false;msg.textContent='目录正在加载…'}
@@ -120,20 +129,17 @@ async function loadCatalog(){
   const r=await fetch('data.json?v='+Math.floor(Date.now()/120000),{cache:'no-store',signal:controller.signal});
   if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();
   if(!Array.isArray(data.items)||!data.generated)throw Error('invalid catalog');
-  if(catalogVersion&&data.generated<catalogVersion)return;
+  if(catalogVersion&&data.generated<catalogVersion){catalogStatus.textContent='服务器数据较旧，显示上次同步的内容。';return}
   if(data.generated===catalogVersion){catalogStatus.textContent='';return}
-  const previousDate=dateFilter.value;all=data.items;catalogVersion=data.generated;catalogLoaded=true;rebuildScores();
-  const dates=[...new Set(all.map(x=>x.date||'undated'))].sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));
-  dateFilter.replaceChildren();const allDates=element('option','','全部日期');allDates.value='all';dateFilter.append(allDates);
-  for(const date of dates){const opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}
-  dateFilter.value=dateManuallySelected&&(previousDate==='all'||dates.includes(previousDate))?previousDate:(dates[0]||'all');
-  document.querySelector('#updated').textContent='最近同步：'+new Date(data.generated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
-  catalogStatus.textContent='';filter(true);
+  applyCatalog(data.items,data.generated);cacheWrite('catalog',all,catalogVersion);
+  catalogStatus.textContent='';
  }catch{
   if(catalogLoaded){catalogStatus.textContent='目录更新暂不可用，显示已有内容。';retryCatalog.hidden=false}
   else{count.textContent='';msg.hidden=false;msg.textContent='目录暂时无法加载，请检查网络后重试。';retryCatalog.hidden=false}
  }finally{clearTimeout(timer);catalogPending=false}
 }
 const catalogStatus=element('span','catalog-status');catalogStatus.setAttribute('role','status');retryCatalog.before(catalogStatus);
+const savedCatalog=cacheObject('catalog');
+if(savedCatalog&&savedCatalog.value.length&&typeof savedCatalog.revision==='string'&&!Number.isNaN(Date.parse(savedCatalog.revision))){applyCatalog(savedCatalog.value,savedCatalog.revision);catalogStatus.textContent='显示上次同步的内容，正在更新…'}
 loadCatalog();setInterval(()=>{if(!document.hidden)loadCatalog()},120000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCatalog()});window.addEventListener('online',loadCatalog);
