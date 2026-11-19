@@ -8,7 +8,7 @@ function autoView(){if(!savedView)setView(mobileView.matches?'list':'grid')}
 viewList.addEventListener('click',()=>setView('list',true));viewGrid.addEventListener('click',()=>setView('grid',true));if(mobileView.addEventListener)mobileView.addEventListener('change',autoView);else if(mobileView.addListener)mobileView.addListener(autoView);setView(savedView||(mobileView.matches?'list':'grid'));
 
 let dateManuallySelected=false,catalogLoaded=false,catalogVersion=null,catalogPending=false;
-let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null;
+let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null,optionsLastFetch=0;
 // Keep the last successful public snapshot for offline fallback. Its revision
 // travels with the snapshot so quota failures cannot mark old data as current.
 const cacheObject=key=>{try{const x=JSON.parse(localStorage.getItem('cloudflower-'+key+'-v1'));return x&&Number.isFinite(x.at)&&x.at<=Date.now()+60000&&Array.isArray(x.value)?x:null}catch{return null}};
@@ -59,8 +59,8 @@ async function refreshReviews(){
   if(reviewFetchPending)return;reviewFetchPending=true;retryReviews.disabled=true;
   const get=readJSON,previousState=reviewSyncState;let changed=false;
   try{
-    const [opts,version]=await Promise.allSettled([optionsFetched?Promise.resolve(null):get('options'),get('version')]);
-    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;cacheWrite('options',optionNames);changed=true}
+    const [opts,version]=await Promise.allSettled([optionsFetched&&Date.now()-optionsLastFetch<60000?Promise.resolve(null):get('options'),get('version')]);
+    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;optionsLastFetch=Date.now();cacheWrite('options',optionNames);changed=true}
     let state=version.status==='fulfilled'?version.value:null;
     if(!state||!state.ready||!hasReviewData||reviewRevision!==String(state.revision)){
       let data=await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;changed=true;
@@ -103,7 +103,7 @@ function append(){
   if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
   const links=element('div','card-links');for(const [name,raw] of Object.entries(x.links||{})){try{const dest=new URL(raw);if(dest.protocol!=='https:')continue;const link=element('a','',name+' ↗');link.href=dest.href;link.target='_blank';link.rel='noopener noreferrer';links.append(link)}catch{}}if(links.childElementCount)body.append(links);
 
-  if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
+  if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?(optionsFetched?'暂未匹配评价入口':'评价信息更新中…'):reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card);cardIndex++
  }
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
@@ -112,7 +112,7 @@ function filter(preserve=false){let keep=preserve?shown:0,s=q.value.trim().toLoc
 document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{dateManuallySelected=true;q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});
 const retryCatalog=element('button','inline-retry catalog-retry','重试加载目录');retryCatalog.type='button';retryCatalog.hidden=true;msg.after(retryCatalog);retryCatalog.addEventListener('click',loadCatalog);
 function applyCatalog(items,version){
-  const previousDate=dateFilter.value;all=items;catalogVersion=version;catalogLoaded=true;rebuildScores();
+  const previousDate=dateFilter.value;if(catalogVersion&&catalogVersion!==version)optionsFetched=false;all=items;catalogVersion=version;catalogLoaded=true;rebuildScores();
   const dates=[...new Set(all.map(x=>x.date||'undated'))].sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));
   dateFilter.replaceChildren();const allDates=element('option','','全部日期');allDates.value='all';dateFilter.append(allDates);
   for(const date of dates){const opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}
@@ -140,6 +140,10 @@ async function loadCatalog(){
 }
 const catalogStatus=element('span','catalog-status');catalogStatus.setAttribute('role','status');retryCatalog.before(catalogStatus);
 const savedCatalog=cacheObject('catalog');
-if(savedCatalog&&savedCatalog.value.length&&typeof savedCatalog.revision==='string'&&!Number.isNaN(Date.parse(savedCatalog.revision))){applyCatalog(savedCatalog.value,savedCatalog.revision);catalogStatus.textContent='显示上次同步的内容，正在更新…'}
+let bootstrap=null;try{bootstrap=JSON.parse(document.querySelector('#catalog-bootstrap')?.textContent||'null')}catch{}
+const validSnapshot=x=>x&&Array.isArray(x.items)&&typeof x.generated==='string'&&!Number.isNaN(Date.parse(x.generated));
+const savedSnapshot=savedCatalog?{items:savedCatalog.value,generated:savedCatalog.revision}:null;
+const initial=validSnapshot(bootstrap)&&(!validSnapshot(savedSnapshot)||bootstrap.generated>=savedSnapshot.generated)?bootstrap:savedSnapshot;
+if(validSnapshot(initial))applyCatalog(initial.items,initial.generated);
 loadCatalog();setInterval(()=>{if(!document.hidden)loadCatalog()},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCatalog()});window.addEventListener('online',loadCatalog);
