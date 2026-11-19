@@ -110,3 +110,30 @@ body footer{border-color:#e5eaf3;background:rgba(255,255,255,.5);color:#8792aa}
 
 /* 点击剧名查看本剧评价 */
 .drama-title-link{color:inherit;text-decoration:none}.drama-title-link:hover{text-decoration:underline;text-decoration-color:#a4b5df;text-underline-offset:4px}
+
+
+/* Cloudflower poster library */
+body #grid.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:start;gap:20px}
+body #grid .card{display:flex;flex-direction:column;gap:0;padding:10px;border-radius:17px;min-width:0}
+body #grid .poster-link{display:block;width:100%;border-radius:10px;text-decoration:none}
+body #grid .card .cover{display:flex;align-items:center;justify-content:center;flex:none;width:100%;height:auto;min-width:0;aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:#eff2fb}
+body #grid .cover img{width:100%;height:100%;min-height:0;object-fit:contain;object-position:center}
+body #grid .poster-empty{color:#94a3c4;font-size:13px}
+body #grid .cardbody{padding:13px 4px 4px;width:100%;min-width:0}
+body #grid .card .date{margin:0 0 5px;font-size:11px}
+body #grid .card h3{font-size:15px;line-height:1.45;margin:0 0 8px;overflow-wrap:anywhere}
+body #grid .card .rating-live{font-size:12px;margin:0 0 3px;padding:2px 8px}
+body #grid .card-reviews{margin-top:11px;padding-top:9px}
+body #grid .review-head{align-items:center;margin-bottom:4px;gap:5px}
+body #grid .review-head strong{font-size:12px}
+body #grid .review-link{font-size:11px;min-height:32px}
+body #grid .review-snippet{padding:8px;margin-top:6px}
+body #grid .review-meta{gap:3px 7px;font-size:11px}
+body #grid .review-time{margin-left:0}
+body #grid .review-text{font-size:12px;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
+body #grid .review-empty{font-size:12px;line-height:1.5;margin:10px 0 0}
+.back-to-top{position:fixed;right:22px;bottom:22px;z-index:10;width:44px;height:44px;border:1px solid #dce5f6;border-radius:50%;background:#fff;color:#637ec4;font-size:23px;line-height:1;box-shadow:0 5px 18px rgba(75,94,145,.15)}
+.back-to-top[hidden]{display:none}.back-to-top:hover{background:#eff3ff}
+@media(max-width:900px){body #grid.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}}
+@media(max-width:600px){body #grid.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}body #grid .card{padding:8px;border-radius:14px}body #grid .cardbody{padding:10px 3px 3px}body #grid .card h3{font-size:14px;line-height:1.42}body #grid .review-head{align-items:flex-start;flex-direction:column;gap:0}body #grid .review-link{min-height:28px}body #grid .card .rating-live{font-size:11px}.back-to-top{right:14px;bottom:16px}}
+@media(prefers-color-scheme:dark){body #grid .card .cover{background:#30384e}.back-to-top{background:#293247;color:#c4d3ff;border-color:#465470}.back-to-top:hover{background:#36425c}}
