@@ -73,7 +73,7 @@ function reviewPanel(data,title){
   const link=element('a','review-link',data.reviews.length?'去评价页 ↗':'写第一条评价 ↗');link.textContent=data.reviews.length?'查看全部评价 ↗':'写第一条评价 ↗';link.href=dramaUrl(title,data.option);head.append(link);section.append(head);
   const latest=data.reviews.filter(r=>r.content&&r.content.trim()).slice(0,3);
   if(!latest.length){section.append(element('p','review-empty','还没有短评，欢迎分享你的感受。'));return section}
-  for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating)meta.append(element('span','review-stars','★'.repeat(r.rating)+'☆'.repeat(5-r.rating)));if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));section.append(row)}return section
+  for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating)meta.append(element('span','review-stars','★'.repeat(r.rating)+'☆'.repeat(5-r.rating)));if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));if(r.id)row.append(CloudLikes.button('review',r.id));section.append(row)}return section
 }
 function render(keep=0){grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}
 function append(){
@@ -82,7 +82,7 @@ function append(){
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
   if(x.image){const img=document.createElement('img');img.src=x.image;img.alt=x.title+' 海报';img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))},{once:true});cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
-  const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link',x.title);titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);
+  const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link',x.title);titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);body.append(CloudLikes.button('drama',x.title));
   if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';body.append(element('p','rating rating-live',score))}
   if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card)

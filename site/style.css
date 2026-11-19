@@ -143,3 +143,11 @@ body #grid .review-empty{font-size:12px;line-height:1.5;margin:10px 0 0}
 .inline-retry[hidden]{display:none}.inline-retry:disabled{opacity:.55;cursor:wait}.inline-retry:hover:not(:disabled){background:var(--soft)}
 .poster-link:focus-visible,.drama-title-link:focus-visible,.inline-retry:focus-visible,.back-to-top:focus-visible{outline:3px solid #7896e4;outline-offset:3px}
 @media(max-width:600px){body .date-controls .inline-retry{grid-column:1 / -1;justify-self:start}body #grid .card h3{word-break:normal;overflow-wrap:anywhere}body #grid .review-meta{line-height:1.5}}
+
+/* Likes */
+.like-button{display:inline-flex;align-items:center;gap:5px;min-height:36px;margin:6px 0 9px;padding:5px 10px;border:1px solid #e0e6f7;border-radius:10px;background:#f6f7ff;color:#6277b3;font:inherit;font-weight:600;font-size:13px;line-height:1.2;cursor:pointer}
+.like-button:hover:not(:disabled){background:#edf1ff;border-color:#bdcbea}.like-button:focus-visible{outline:3px solid #7896e4;outline-offset:2px}.like-button[aria-pressed=true]{color:#be6f91;background:#fff4f8;border-color:#f3dce8}.like-button:disabled{cursor:default;opacity:.85}
+.review-snippet .like-button{min-height:30px;padding:4px 8px;margin:5px 0 0;font-size:11px}.review-card .like-button{margin:10px 0 0}
+@media(prefers-color-scheme:dark){.like-button{background:#303951;border-color:#465470;color:#c3d3ff}.like-button[aria-pressed=true]{background:#54384a;border-color:#745263;color:#f2b7cf}}
+
+.like-privacy{max-width:1070px;margin:0 auto;padding:0 18px 16px;color:var(--muted);font-size:12px;line-height:1.6}
