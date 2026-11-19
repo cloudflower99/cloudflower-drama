@@ -215,3 +215,21 @@ body .date-controls select:focus-visible{outline:3px solid #7896e4;outline-offse
  body #grid[data-view="list"] .card .cover.portrait{width:100%;height:auto;max-width:190px}
  body #grid[data-view="list"] .cover.portrait img{width:auto;max-width:100%;max-height:285px;margin:auto;object-fit:contain}
 }
+
+/* Full-width, compact mobile list cards. */
+@media(max-width:600px){
+ body #grid[data-view="list"] .card{display:grid;grid-template-columns:minmax(0,54%) minmax(0,1fr);column-gap:12px;row-gap:7px;width:100%;height:auto;align-content:start;align-items:start;justify-self:stretch}
+ body #grid[data-view="list"] .poster-link{grid-column:1;grid-row:1 / 6;width:100%;align-self:start}
+ body #grid[data-view="list"] .card .cover,body #grid[data-view="list"] .card .cover.portrait{width:100%;max-width:190px;margin:0}
+ body #grid[data-view="list"] .cover.portrait img{width:auto;max-width:100%;max-height:285px;margin:0 auto}
+ body #grid[data-view="list"] .cardbody{display:contents}
+ body #grid[data-view="list"] .cardbody > .date{grid-column:2;grid-row:1;margin:0}
+ body #grid[data-view="list"] .cardbody > h3{grid-column:2;grid-row:2;min-width:0;margin:0}
+ body #grid[data-view="list"] .cardbody > .card-summary{grid-column:2;grid-row:3;min-width:0;margin:0}
+ body #grid[data-view="list"] .cardbody > .card-stats{grid-column:2;grid-row:4;min-width:0;min-height:0}
+ body #grid[data-view="list"] .cardbody > .card-links{grid-column:2;grid-row:5;margin:0}
+ body #grid[data-view="list"] .cardbody > .card-reviews,body #grid[data-view="list"] .cardbody > .review-empty{grid-column:1 / -1;grid-row:6;margin-top:4px}
+ body #grid[data-view="list"] .card-reviews{padding-top:10px}
+ body #grid[data-view="list"] .title-main{font-size:17px}
+ body #grid[data-view="list"] .card-summary{font-size:13px;line-height:1.5}
+}
