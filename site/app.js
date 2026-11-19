@@ -1,6 +1,7 @@
 'use strict';
 const grid=document.querySelector('#grid'), count=document.querySelector('#count'), msg=document.querySelector('#message'), more=document.querySelector('#more'), q=document.querySelector('#q'), dateFilter=document.querySelector('#date-filter');
 let all=[],filtered=[],shown=0;const size=18;
+let dateManuallySelected=false,catalogLoaded=false,catalogVersion=null,catalogPending=false;
 let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null;
 // Keep the last successful public snapshot for offline fallback. Its revision
 // travels with the snapshot so quota failures cannot mark old data as current.
@@ -76,6 +77,13 @@ function reviewPanel(data,title){
   for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating)meta.append(element('span','review-stars','★'.repeat(r.rating)+'☆'.repeat(5-r.rating)));if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));if(r.id)row.append(CloudLikes.button('review',r.id));section.append(row)}return section
 }
 function render(keep=0){grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}
+function splitTitle(title){
+ const lastChinese=Math.max(...Array.from(title.matchAll(/[\u3400-\u9fff]/g),m=>m.index),-1);
+ if(lastChinese<0)return [title,''];
+ const tail=title.slice(lastChinese+1),boundary=/\s+(?=[A-Za-z])/.exec(tail);
+ if(!boundary)return [title,''];
+ const at=lastChinese+1+boundary.index;return [title.slice(0,at).trim(),title.slice(at).trim()];
+}
 function append(){
  let cardIndex=0;
  for(const x of filtered.slice(shown,shown+size)){
@@ -83,15 +91,41 @@ function append(){
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
   if(x.image){const img=document.createElement('img');img.alt=x.title+' 海报';img.loading=shown===0&&cardIndex<2?'eager':'lazy';img.decoding='async';if(shown===0&&cardIndex===0)img.fetchPriority='high';let fallback=!!x.thumbnail&&x.thumbnail!==x.image;img.addEventListener('error',()=>{if(fallback){fallback=false;img.src=x.image}else{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))}});img.src=x.thumbnail||x.image;cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
-  const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link',x.title);titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);body.append(CloudLikes.button('drama',x.title));
-  if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';body.append(element('p','rating rating-live',score))}
+  const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link');titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');titleLink.title=x.title;const [mainTitle,englishTitle]=splitTitle(x.title);titleLink.append(element('span','title-main',mainTitle),element('span','title-en',englishTitle));heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);
+  body.append(element('p','card-summary',(x.description||'暂无简介').replace(/\s+/g,' ').trim()));
+  const stats=element('div','card-stats');stats.append(CloudLikes.button('drama',x.title));
+  if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
   if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card);cardIndex++
  }
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
 }
 function filter(preserve=false){let keep=preserve?shown:0,s=q.value.trim().toLocaleLowerCase();filtered=all.filter(x=>(!s||x.title.toLocaleLowerCase().includes(s))&&(s||!dateFilter||dateFilter.value==='all'||(x.date||'undated')===dateFilter.value));if(sortOrder.value==='rating'&&reviewReady)filtered.sort((a,b)=>{let x=reviewByTitle.get(a.title)?.score,y=reviewByTitle.get(b.title)?.score;return x==null?(y==null?0:1):y==null?-1:y-x});render(keep)}
-document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});
+document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{dateManuallySelected=true;q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});
 const retryCatalog=element('button','inline-retry catalog-retry','重试加载目录');retryCatalog.type='button';retryCatalog.hidden=true;msg.after(retryCatalog);retryCatalog.addEventListener('click',loadCatalog);
-function loadCatalog(){retryCatalog.hidden=true;msg.hidden=false;msg.textContent='目录正在加载…';fetch('data.json').then(r=>{if(!r.ok)throw Error('load');return r.json()}).then(data=>{all=data.items;rebuildScores();const dates=[...new Set(all.map(x=>x.date||'undated'))];dates.sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));if(dateFilter){for(const date of dates){let opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}dateFilter.value=dates[0]||'all'};document.querySelector('#updated').textContent='最近同步：'+new Date(data.generated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});filter()}).catch(()=>{count.textContent='';msg.hidden=false;msg.textContent='目录暂时无法加载，请检查网络后重试。';retryCatalog.hidden=false});}
-loadCatalog();
+async function loadCatalog(){
+ if(catalogPending)return;catalogPending=true;retryCatalog.hidden=true;
+ if(!catalogLoaded){msg.hidden=false;msg.textContent='目录正在加载…'}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  // Revalidate and vary the URL periodically, avoiding stale browser/CDN copies.
+  const r=await fetch('data.json?v='+Math.floor(Date.now()/120000),{cache:'no-store',signal:controller.signal});
+  if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();
+  if(!Array.isArray(data.items)||!data.generated)throw Error('invalid catalog');
+  if(catalogVersion&&data.generated<catalogVersion)return;
+  if(data.generated===catalogVersion){catalogStatus.textContent='';return}
+  const previousDate=dateFilter.value;all=data.items;catalogVersion=data.generated;catalogLoaded=true;rebuildScores();
+  const dates=[...new Set(all.map(x=>x.date||'undated'))].sort((a,b)=>a==='undated'?1:b==='undated'?-1:b.localeCompare(a));
+  dateFilter.replaceChildren();const allDates=element('option','','全部日期');allDates.value='all';dateFilter.append(allDates);
+  for(const date of dates){const opt=element('option','',date==='undated'?'日期未注明':date);opt.value=date;dateFilter.append(opt)}
+  dateFilter.value=dateManuallySelected&&(previousDate==='all'||dates.includes(previousDate))?previousDate:(dates[0]||'all');
+  document.querySelector('#updated').textContent='最近同步：'+new Date(data.generated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});
+  catalogStatus.textContent='';filter(true);
+ }catch{
+  if(catalogLoaded){catalogStatus.textContent='目录更新暂不可用，显示已有内容。';retryCatalog.hidden=false}
+  else{count.textContent='';msg.hidden=false;msg.textContent='目录暂时无法加载，请检查网络后重试。';retryCatalog.hidden=false}
+ }finally{clearTimeout(timer);catalogPending=false}
+}
+const catalogStatus=element('span','catalog-status');catalogStatus.setAttribute('role','status');retryCatalog.before(catalogStatus);
+loadCatalog();setInterval(()=>{if(!document.hidden)loadCatalog()},120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadCatalog()});window.addEventListener('online',loadCatalog);

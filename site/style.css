@@ -144,3 +144,18 @@ body #grid .review-empty{font-size:12px;line-height:1.5;margin:10px 0 0}
 .like-button{align-self:flex-start;min-height:30px;padding:4px 7px;gap:3px;margin:3px 0 6px;border-radius:8px;font-size:12px;position:relative}.like-button::after{content:"";position:absolute;inset:-5px}.review-snippet .like-button{min-height:27px;padding:3px 6px;margin:4px 0 0;font-size:11px}.review-card .like-button{margin:8px 0 0}
 @media(max-width:400px){body .nav{gap:5px}.nav-actions{gap:5px}.theme-toggle{font-size:12px;padding:6px 8px;min-height:34px}body .navlink{font-size:12px;padding:7px 8px}body .brand{font-size:14px}}
 @media(max-width:360px){body .brand{font-size:12px;white-space:nowrap}.nav-actions{gap:3px}.theme-toggle{padding:6px}.hero .search input{font-size:13px}.hero .search button{padding-left:12px;padding-right:12px}}
+
+/* Equal-height cards and a restrained bilingual hierarchy. */
+body #grid.grid{align-items:stretch}
+body #grid .card{height:100%}
+body #grid .card h3{margin:0 0 8px}
+body #grid .drama-title-link{display:block;text-decoration:none}
+body #grid .title-main,body #grid .title-en{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+body #grid .title-main{font-size:16px;line-height:1.4;height:2.8em;font-weight:750;color:var(--text)}
+body #grid .title-en{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:13px;line-height:1.35;height:2.7em;margin-top:3px;color:#7483a5}
+body #grid .card-summary{font-size:13px;line-height:1.5;height:3em;margin:0 0 8px;color:var(--muted);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+body #grid .card-stats{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;min-height:34px}
+body #grid .card-stats .like-button,body #grid .card-stats .rating-live{margin:0}
+.catalog-status{display:block;color:var(--muted);font-size:14px;margin:8px 0}
+@media(max-width:600px){body #grid .title-main{font-size:15px}body #grid .title-en{font-size:12px}body #grid .card-summary{font-size:12px}}
+:where(html[data-theme="dark"]) body #grid .title-en{color:#afbddb}

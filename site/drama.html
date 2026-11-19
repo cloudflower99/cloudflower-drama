@@ -56,7 +56,7 @@ function renderDetail(item){
  const links=document.createElement('div');links.className='links';for(const [name,url] of Object.entries(item.links||{})){try{if(new URL(url).protocol!=='https:')continue}catch{continue}const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=name+' ↗';links.append(a)}if(links.childElementCount)body.append(links);
  card.append(body);region.append(card)
 }
-fetch('data.json').then(r=>{if(!r.ok)throw Error();return r.json()}).then(d=>{const items=Array.isArray(d.items)?d.items:[];catalogTitles=items.map(x=>x.title);renderDetail(items.find(x=>x.title===viewTitle));resolveView()}).catch(()=>{catalogTitles=[];renderDetail(null);resolveView()});
+fetch('data.json?v='+Math.floor(Date.now()/120000),{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(d=>{const items=Array.isArray(d.items)?d.items:[];catalogTitles=items.map(x=>x.title);renderDetail(items.find(x=>x.title===viewTitle));resolveView()}).catch(()=>{catalogTitles=[];renderDetail(null);resolveView()});
 const dramaInput=$('#drama'),dramaMenu=$('#drama-menu'),dramaList=$('#drama-options'),dramaHint=$('#drama-hint');
 function validateDrama(){let v=dramaInput.value.trim();dramaInput.setCustomValidity(v&&!dramaNames.includes(v)?'请从列表选择剧集':'')}
 function closeDrama(){dramaMenu.hidden=true;dramaInput.setAttribute('aria-expanded','false');dramaInput.removeAttribute('aria-activedescendant');comboActive=-1}
