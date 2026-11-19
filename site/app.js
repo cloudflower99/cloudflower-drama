@@ -77,15 +77,16 @@ function reviewPanel(data,title){
 }
 function render(keep=0){grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}
 function append(){
+ let cardIndex=0;
  for(const x of filtered.slice(shown,shown+size)){
   const review=reviewByTitle.get(x.title),url=dramaUrl(x.title,review?.option),card=element('article','card'),posterLink=element('a','poster-link'),cover=element('div','cover');
   posterLink.href=url;posterLink.setAttribute('aria-label','查看 '+x.title+' 的详情和评价');
-  if(x.image){const img=document.createElement('img');img.src=x.image;img.alt=x.title+' 海报';img.loading='lazy';img.decoding='async';img.addEventListener('error',()=>{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))},{once:true});cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
+  if(x.image){const img=document.createElement('img');img.alt=x.title+' 海报';img.loading=shown===0&&cardIndex<2?'eager':'lazy';img.decoding='async';if(shown===0&&cardIndex===0)img.fetchPriority='high';let fallback=!!x.thumbnail&&x.thumbnail!==x.image;img.addEventListener('error',()=>{if(fallback){fallback=false;img.src=x.image}else{img.remove();cover.append(element('span','poster-empty','☁ 暂无海报'))}});img.src=x.thumbnail||x.image;cover.append(img)}else cover.append(element('span','poster-empty','☁ 暂无海报'));
   posterLink.append(cover);card.append(posterLink);
   const body=element('div','cardbody'),heading=element('h3'),titleLink=element('a','drama-title-link',x.title);titleLink.href=url;titleLink.setAttribute('aria-label',x.title+' 的全部评价');heading.append(titleLink);body.append(element('p','date',x.date||'日期未注明'),heading);body.append(CloudLikes.button('drama',x.title));
   if(reviewReady&&review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';body.append(element('p','rating rating-live',score))}
   if(reviewReady&&review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?'暂未匹配评价入口':reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
-  card.append(body);grid.append(card)
+  card.append(body);grid.append(card);cardIndex++
  }
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
 }
