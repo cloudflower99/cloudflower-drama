@@ -7,7 +7,7 @@ function setView(mode,persist=false){grid.dataset.view=mode;viewList.setAttribut
 function autoView(){if(!savedView)setView(mobileView.matches?'list':'grid')}
 viewList.addEventListener('click',()=>setView('list',true));viewGrid.addEventListener('click',()=>setView('grid',true));if(mobileView.addEventListener)mobileView.addEventListener('change',autoView);else if(mobileView.addListener)mobileView.addListener(autoView);setView(savedView||(mobileView.matches?'list':'grid'));
 
-let dateManuallySelected=false,catalogLoaded=false,catalogVersion=null,catalogPending=false;
+let dateManuallySelected=false,catalogLoaded=false,catalogVersion=null,catalogPending=false,catalogETag=null;
 let reviewRows=[],optionNames=[],reviewByTitle=new Map(),reviewReady=false,optionsReady=false,hasReviewData=false,reviewFetchPending=false,optionsFetched=false,reviewSyncState='loading',reviewRevision=null,optionsLastFetch=0;
 // Keep the last successful public snapshot for offline fallback. Its revision
 // travels with the snapshot so quota failures cannot mark old data as current.
@@ -22,8 +22,8 @@ async function readJSON(path){
   finally{clearTimeout(timer)}
  }
 }
-reviewRevision=cacheObject('reviews')?.revision??null;
-const savedOptions=cacheRead('options'),savedReviews=cacheRead('reviews');
+const savedReviewObject=cacheObject('reviews');reviewRevision=savedReviewObject?.revision??null;
+const savedOptions=cacheRead('options'),savedReviews=savedReviewObject?.value||null;
 if(savedOptions){optionNames=savedOptions;optionsReady=true}if(savedReviews){reviewRows=savedReviews;hasReviewData=true;if(optionsReady){reviewReady=true;reviewSyncState='updating'}}
 let reviewPreviews=new Map();try{const data=JSON.parse(document.querySelector('#review-bootstrap')?.textContent||'{}');if(data&&typeof data==='object'&&!Array.isArray(data))reviewPreviews=new Map(Object.entries(data))}catch{}
 
@@ -61,7 +61,7 @@ async function refreshReviews(){
   const get=readJSON,previousState=reviewSyncState;let changed=false;
   try{
     const [opts,version]=await Promise.allSettled([optionsFetched&&Date.now()-optionsLastFetch<60000?Promise.resolve(null):get('options'),get(hasReviewData?'version':'reviews')]);
-    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){optionNames=opts.value.options;optionsReady=optionsFetched=true;optionsLastFetch=Date.now();cacheWrite('options',optionNames);changed=true}
+    if(opts.status==='fulfilled'&&opts.value&&Array.isArray(opts.value.options)){const names=opts.value.options,different=!optionsReady||names.length!==optionNames.length||names.some((v,i)=>v!==optionNames[i]);optionsReady=optionsFetched=true;optionsLastFetch=Date.now();if(different){optionNames=names;cacheWrite('options',optionNames);changed=true}}
     let state=version.status==='fulfilled'?version.value:null;
     if(!state||!state.ready||!hasReviewData||reviewRevision!==String(state.revision)){
       let data=Array.isArray(state?.reviews)?state:await get('reviews');if(!Array.isArray(data.reviews))throw Error('reviews');reviewRows=data.reviews;hasReviewData=true;changed=true;
@@ -110,7 +110,7 @@ function append(){
  shown=Math.min(shown+size,filtered.length);more.hidden=shown>=filtered.length;count.textContent=`${filtered.length} 部剧集`;msg.hidden=filtered.length>0;msg.textContent='没有找到相关剧集，试试其他关键词或日期。'
 }
 function filter(preserve=false){let keep=preserve?shown:0,s=q.value.trim().toLocaleLowerCase();filtered=all.filter(x=>(!s||x.title.toLocaleLowerCase().includes(s))&&(s||!dateFilter||dateFilter.value==='all'||(x.date||'undated')===dateFilter.value));if(sortOrder.value==='likes'&&CloudLikes.ready?.())filtered.sort((a,b)=>CloudLikes.count('drama',b.title)-CloudLikes.count('drama',a.title));if(sortOrder.value==='rating'&&reviewReady)filtered.sort((a,b)=>{let x=reviewByTitle.get(a.title)?.score,y=reviewByTitle.get(b.title)?.score;return x==null?(y==null?0:1):y==null?-1:y-x});render(keep)}
-document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();filter()});q.addEventListener('input',filter);if(dateFilter)dateFilter.addEventListener('change',()=>{dateManuallySelected=true;q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});document.addEventListener('cloudlikeschange',()=>{updateSortNotice();if(sortOrder.value==='likes'&&all.length)filter(true)});
+let searchTimer;const scheduleSearch=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>filter(),120)};document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDefault();clearTimeout(searchTimer);filter()});q.addEventListener('input',e=>{if(!e.isComposing)scheduleSearch()});q.addEventListener('compositionend',scheduleSearch);if(dateFilter)dateFilter.addEventListener('change',()=>{dateManuallySelected=true;q.value='';filter()});more.addEventListener('click',append);sortOrder.addEventListener('change',()=>{updateSortNotice();filter()});document.addEventListener('cloudlikeschange',()=>{updateSortNotice();if(sortOrder.value==='likes'&&all.length)filter(true)});
 const retryCatalog=element('button','inline-retry catalog-retry','重试加载目录');retryCatalog.type='button';retryCatalog.hidden=true;msg.after(retryCatalog);retryCatalog.addEventListener('click',loadCatalog);
 function applyCatalog(items,version){
   const previousDate=dateFilter.value;if(catalogVersion&&catalogVersion!==version)optionsFetched=false;all=items;catalogVersion=version;catalogLoaded=true;rebuildScores();
@@ -127,11 +127,12 @@ async function loadCatalog(){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
  try{
   // Revalidate and vary the URL periodically, avoiding stale browser/CDN copies.
-  const r=await fetch('data.json?v='+Math.floor(Date.now()/30000),{cache:'no-store',signal:controller.signal});
+  const r=await fetch('data.json?v='+Math.floor(Date.now()/30000),{cache:'no-store',signal:controller.signal,headers:catalogETag?{'If-None-Match':catalogETag}:{}});
+  if(r.status===304&&catalogLoaded){catalogStatus.textContent='';return}
   if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();
   if(!Array.isArray(data.items)||!data.generated)throw Error('invalid catalog');
   if(catalogVersion&&data.generated<catalogVersion){catalogStatus.textContent='服务器数据较旧，显示上次同步的内容。';return}
-  if(data.generated===catalogVersion){catalogStatus.textContent='';return}
+  catalogETag=r.headers.get('etag');if(data.generated===catalogVersion){catalogStatus.textContent='';return}
   applyCatalog(data.items,data.generated);cacheWrite('catalog',all,catalogVersion);
   catalogStatus.textContent='';
  }catch{
