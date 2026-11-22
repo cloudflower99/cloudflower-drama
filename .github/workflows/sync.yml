@@ -125,7 +125,7 @@ jobs:
                   if len(matches) != 1: continue
                   option = matches[0]
                   rows = sorted(groups.get(option, []), key=lambda r: str(r.get('time') or ''), reverse=True)
-                  ratings = [r['rating'] for r in rows if type(r.get('rating')) in (int, float) and 1 <= r['rating'] <= 5]
+                  ratings = [r['rating'] for r in rows if type(r.get('rating')) in (int, float) and 0.5 <= r['rating'] <= 5]
                   latest = [{k: r.get(k) for k in ('id','author','content','rating','time')} for r in rows if isinstance(r.get('content'), str) and r['content'].strip()][:3]
                   previews[title] = {'option': option, 'reviews': latest, 'hasReviews': bool(rows), 'count': len(ratings), 'score': sum(ratings) / len(ratings) if ratings else None, 'average': format(sum(ratings) / len(ratings), '.1f') if ratings else None}
           except Exception as exc:
@@ -162,7 +162,7 @@ jobs:
                   snippets = []
                   for r in review['reviews']:
                       rating = r.get('rating')
-                      stars = '★' * int(rating) + '☆' * (5 - int(rating)) if type(rating) in (int,float) and 1 <= rating <= 5 else ''
+                      stars = ('★' * int(rating) + ('<span style="position:relative;display:inline-block">☆<span aria-hidden="true" style="position:absolute;left:0;top:0;width:50%;overflow:hidden;white-space:nowrap">★</span></span>' if rating % 1 else '') + '☆' * (5 - int(rating) - (1 if rating % 1 else 0))) if type(rating) in (int,float) and 0.5 <= rating <= 5 else ''
                       content = r['content'].strip()
                       if len(content) > 120: content = content[:120] + '…'
                       snippets.append('<div class="review-snippet"><div class="review-meta"><span class="review-author">' + esc(r.get('author') or '匿名观众') + '</span>' + ('<span class="review-stars">' + stars + '</span>' if stars else '') + '</div><p class="review-text">' + esc(content) + '</p></div>')
