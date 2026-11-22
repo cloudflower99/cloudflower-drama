@@ -52,7 +52,7 @@ function rebuildScores(){
     const direct=exact.get(ts[i])||[],possible=direct.length?direct:(prefixes.get(i)||[]);
     if(possible.length!==1)continue;
     const option=optionNames[possible[0]],reviews=(grouped.get(option)||[]).slice().sort((a,b)=>(b.time||'').localeCompare(a.time||''));
-    const rated=reviews.filter(r=>r.rating>=1&&r.rating<=5),total=rated.reduce((sum,r)=>sum+r.rating,0);
+    const rated=reviews.filter(r=>r.rating>=0.5&&r.rating<=5),total=rated.reduce((sum,r)=>sum+r.rating,0);
     reviewByTitle.set(titles[i],{option,reviews,count:rated.length,score:rated.length?total/rated.length:null,average:rated.length?(total/rated.length).toFixed(1):null});
   }
 }
@@ -74,6 +74,7 @@ async function refreshReviews(){
 }
 updateSortNotice();refreshReviews();setInterval(()=>{if(!document.hidden)refreshReviews()},15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReviews()});window.addEventListener('online',refreshReviews);
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e}
+function renderStars(el,value){const n=Number(value);if(!Number.isFinite(n)||n<=0||n>5){el.textContent='未评分';return}const whole=Math.floor(n),half=n%1!==0;el.setAttribute('aria-label',n+' 星，满分 5 星');el.textContent='★'.repeat(whole);if(half){let h=document.createElement('span');h.style.cssText='position:relative;display:inline-block';h.textContent='☆';let f=document.createElement('span');f.setAttribute('aria-hidden','true');f.style.cssText='position:absolute;left:0;top:0;width:50%;overflow:hidden;white-space:nowrap';f.textContent='★';h.append(f);el.append(h)}el.append(document.createTextNode('☆'.repeat(5-Math.ceil(n))))}
 function dramaUrl(title,option){const q=new URLSearchParams({title});if(option)q.set('drama',option);return 'drama.html?'+q.toString()}
 function reviewPanel(data,title){
   const section=element('section','card-reviews');section.setAttribute('aria-label','本剧最新评价');
@@ -81,7 +82,7 @@ function reviewPanel(data,title){
   const hasReviews=data.hasReviews??!!data.reviews.length;const link=element('a','review-link',hasReviews?'去评价页 ↗':'写第一条评价 ↗');link.textContent=hasReviews?'查看全部评价 ↗':'写第一条评价 ↗';link.href=dramaUrl(title,data.option);head.append(link);section.append(head);
   const latest=data.reviews.filter(r=>r.content&&r.content.trim()).slice(0,3);
   if(!latest.length){section.append(element('p','review-empty','还没有短评，欢迎分享你的感受。'));return section}
-  for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating)meta.append(element('span','review-stars','★'.repeat(r.rating)+'☆'.repeat(5-r.rating)));if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));if(r.id)row.append(CloudLikes.button('review',r.id));section.append(row)}return section
+  for(const r of latest){const row=element('div','review-snippet'),meta=element('div','review-meta');meta.append(element('span','review-author',r.author||'匿名观众'));if(r.rating){const stars=element('span','review-stars');renderStars(stars,r.rating);meta.append(stars)}if(r.time){const time=element('time','review-time');time.dateTime=r.time;time.textContent=new Date(r.time).toLocaleDateString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});meta.append(time)}const chars=Array.from(r.content.trim());row.append(meta,element('p','review-text',chars.length>120?chars.slice(0,120).join('')+'…':chars.join('')));if(r.id)row.append(CloudLikes.button('review',r.id));section.append(row)}return section
 }
 function render(keep=0){grid.replaceChildren();shown=0;do{append()}while(shown<Math.min(keep,filtered.length))}
 function splitTitle(title){
