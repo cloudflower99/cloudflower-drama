@@ -9,7 +9,7 @@ cache_dir=pathlib.Path('.sync-cache'); cache_dir.mkdir(exist_ok=True)
 cache_file=cache_dir/'manifest.json'
 try:
     cache=json.loads(cache_file.read_text(encoding='utf-8')) if cache_file.exists() else {}
-    if cache.get('version')!=1: cache={}
+    if cache.get('version')!=2: cache={}
 except (ValueError,OSError): cache={}
 page_cache=cache.get('pages',{}); image_cache=cache.get('images',{})
 headers={'Authorization':'Bearer '+TOKEN,'Notion-Version':'2022-06-28'}
@@ -233,5 +233,5 @@ if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomple
 items.sort(key=lambda x:(x['date'],x.get('added_at','')),reverse=True)
 sync_review_options(items)
 (out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
-tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache,'home_groups':updated_home},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
+tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':2,'pages':updated_pages,'images':image_cache,'home_groups':updated_home},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
 print('Built',len(items),'shows')
