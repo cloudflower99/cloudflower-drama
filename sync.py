@@ -15,7 +15,7 @@ page_cache=cache.get('pages',{}); image_cache=cache.get('images',{})
 headers={'Authorization':'Bearer '+TOKEN,'Notion-Version':'2022-06-28'}
 last=0
 
-def request(url, headers=None):
+def request(url, headers=None, method='GET', data=None):
     global last
     for attempt in range(6):
         if headers:
@@ -23,7 +23,7 @@ def request(url, headers=None):
             if wait>0: time.sleep(wait)
             last=time.monotonic()
         try:
-            with urllib.request.urlopen(urllib.request.Request(url,headers=headers or {}),timeout=45) as r: return r.read(),r.headers
+            with urllib.request.urlopen(urllib.request.Request(url,headers=headers or {},method=method,data=data),timeout=45) as r: return r.read(),r.headers
         except (urllib.error.HTTPError,urllib.error.URLError,TimeoutError) as e:
             delay=min(2**attempt,30)
             if isinstance(e,urllib.error.HTTPError):
@@ -103,6 +103,62 @@ def stale(ts, now, hours=24):
 def covers_exist(entries):
     return all(not e.get('image') or (out/e['image']).is_file() for e in entries)
 
+# Keep new catalogue entries usable for both reviews and community tags.
+def sync_review_options(items):
+    import unicodedata
+    def norm(value):
+        return ''.join(c for c in unicodedata.normalize('NFKC', value).lower() if not c.isspace() and unicodedata.category(c)[0] not in ('P','S'))
+    review_db='00a26fd4d86d827d959a010d5a9d4f12'
+    def notion_json(path, method='GET', body=None):
+        hdr=dict(headers)
+        payload=None
+        if body is not None:
+            hdr['Content-Type']='application/json'; payload=json.dumps(body,ensure_ascii=False).encode()
+        return json.loads(request(BASE+path,hdr,method=method,data=payload)[0])
+    def get_options():
+        schema=notion_json('databases/'+review_db)
+        result=schema.get('properties',{}).get('评论的剧',{}).get('select',{}).get('options')
+        if not isinstance(result,list) or len(result)<100: raise RuntimeError('评价选项读取不完整，已停止发布')
+        return [o['name'] for o in result if isinstance(o,dict) and isinstance(o.get('name'),str)]
+    names=get_options(); titles=[x.get('title','').strip() for x in items]; nt=[norm(t) for t in titles]; no=[norm(n) for n in names]
+    to_create=[]; ambiguous=[]
+    for title,t in zip(titles,nt):
+        if not t or nt.count(t)!=1:
+            if title: ambiguous.append(title)
+            continue
+        direct=[x for x in no if x==t]
+        if len(direct)==1: continue
+        prefix=[x for x in no if len(x)>=4 and t.startswith(x) and sum(v.startswith(x) for v in nt)==1 and sum(v.startswith(x) for v in no)==1]
+        if not direct and len(prefix)==1: continue
+        # Similar or ambiguous names may already own reviews. Never guess or duplicate.
+        if direct or prefix or any(len(x)>=4 and (t.startswith(x) or x.startswith(t)) for x in no):
+            ambiguous.append(title); continue
+        to_create.append(title)
+    if len(to_create)>30: raise RuntimeError('需新建的评价选项过多，已停止发布，请核对资源名称')
+    for title in to_create:
+        if len(title)>100: raise RuntimeError('剧名过长，无法创建评价选项：'+title[:40])
+        page=notion_json('pages','POST',{'parent':{'database_id':review_db},'properties':{'标题':{'title':[{'text':{'content':'系统配置临时条目（请勿评价）'}}]},'评论的剧':{'select':{'name':title}}}})
+        try: notion_json('pages/'+page['id'],'PATCH',{'archived':True})
+        except Exception as e: raise RuntimeError('评价选项已创建但临时条目清理失败，请检查评价数据库回收站') from e
+    if to_create:
+        names=get_options()
+        if not all(t in names for t in to_create): raise RuntimeError('无法确认新剧的评价选项，已停止发布')
+    # Refresh the shared option cache before publishing; only public names are sent.
+    url='https://api.cloudofflower.ccwu.cc/options?refresh=1'
+    for attempt in range(10):
+        try:
+            req=urllib.request.Request(url,headers={'Origin':'https://aishort.cloudofflowers.com','User-Agent':'cloudflower-site-sync/1.0'})
+            with urllib.request.urlopen(req,timeout=20) as response: data=json.load(response)
+            published=data.get('options')
+            if isinstance(published,list) and all(name in published for name in names): break
+        except Exception as e:
+            print('评价选项同步重试：',type(e).__name__,flush=True)
+        time.sleep(3)
+    else: raise RuntimeError('评价和标签选项未同步，已停止发布，请稍后重试')
+    print('评价和标签选项已同步；新建',len(to_create),'个，需人工核对',len(ambiguous),'个',flush=True)
+    if ambiguous: print('需人工核对名称：', '、'.join(ambiguous[:10]),flush=True)
+
+
 now=datetime.datetime.now(datetime.timezone.utc)
 home_groups=cache.get('home_groups',{}); updated_home={}; home=[]
 for group in children(ROOT):
@@ -155,6 +211,7 @@ for p in archive_pages:
 if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomplete catalog.')
 # New additions sort first within their resource date; historical order is preserved.
 items.sort(key=lambda x:(x['date'],x.get('added_at','')),reverse=True)
+sync_review_options(items)
 (out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
 tmp=cache_file.with_suffix('.tmp'); tmp.write_text(json.dumps({'version':1,'pages':updated_pages,'images':image_cache,'home_groups':updated_home},ensure_ascii=False),encoding='utf-8');tmp.replace(cache_file)
 print('Built',len(items),'shows')
