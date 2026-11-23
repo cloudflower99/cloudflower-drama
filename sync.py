@@ -54,6 +54,8 @@ def text(b):
     return ''.join(t.get('plain_text','') for t in b.get(b['type'],{}).get('rich_text',[]))
 
 def image(block):
+    if 'image' not in block:
+        block=dict(block); block['image']={'type':'external','external':{'url':block['_src']}}
     old=image_cache.get(block['id'],{}); old_path=out/old.get('path','__missing__')
     if old.get('stamp')==block.get('last_edited_time') and old_path.is_file(): return old['path']
     obj=block['image']; kind=obj.get('type'); src=obj.get(kind,{}).get('url')
@@ -84,8 +86,22 @@ def parse_group(group, default_date=''):
             u=t.get('href') or ((t.get('text') or {}).get('link') or {}).get('url')
             label=t.get('plain_text','')
             if u and label in ('百度网盘','夸克网盘','迅雷网盘') and u.startswith('https://'): links[label]=u
+        if re.fullmatch(r'https://\S+\.(?:jpe?g|png|webp|gif)(?:\?\S*)?',s): continue
         if s and not s.startswith('📥'): description.append(s)
     img=next((b for b in blocks if b['type']=='image'),None)
+    if not img:
+        for b in blocks:
+            o=b.get(b['type'],{}) if isinstance(b.get(b['type']),dict) else {}
+            cand=o.get('url') or ''
+            if not cand and b['type'] in ('paragraph','embed','bookmark','link_preview'):
+                m=re.search(r'https://\S+?\.(?:jpe?g|png|webp|gif)(?:\?\S*)?',text(b) if b['type']=='paragraph' else '')
+                cand=m.group(0) if m else ''
+            if not cand:
+                for t in o.get('rich_text',[]) if isinstance(o,dict) else []:
+                    u=t.get('href') or ((t.get('text') or {}).get('link') or {}).get('url') or ''
+                    if re.search(r'\.(?:jpe?g|png|webp|gif)(?:\?|$)',u): cand=u;break
+            if cand.startswith('https://') and re.search(r'\.(?:jpe?g|png|webp|gif)(?:\?|$)',cand):
+                img={'id':b['id'],'_src':cand,'last_edited_time':b.get('last_edited_time')};break
     return {'title':title,'date':date,'rating':rating,'description':'\n\n'.join(description),'links':links,'image':image(img) if img else '', 'added_at': group.get('created_time','') if group.get('created_time','') >= '2026-11-17T03:40:00Z' else ''}
 
 def parse_page(page, default_date=''):
