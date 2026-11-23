@@ -233,3 +233,30 @@ body .date-controls select:focus-visible{outline:3px solid #7896e4;outline-offse
  body #grid[data-view="list"] .title-main{font-size:17px}
  body #grid[data-view="list"] .card-summary{font-size:13px;line-height:1.5}
 }
+/* Consistent uncropped poster frames across catalogue views. */
+body #grid .card .cover,body #grid .card .cover.portrait,body #grid[data-view="list"] .card .cover,body #grid[data-view="list"] .card .cover.portrait{display:flex;align-items:center;justify-content:center;width:100%;height:auto;aspect-ratio:2/3;overflow:hidden;background:var(--soft)}
+body #grid .cover img,body #grid .cover.portrait img,body #grid[data-view="list"] .cover.portrait img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;margin:0;object-fit:contain;object-position:center;border-radius:0}
+/* Align each row of cards by content, without hiding long tag lists. */
+@supports (grid-template-rows:subgrid){
+ body #grid.grid[data-view="grid"]{row-gap:0}
+ body #grid[data-view="grid"] .card{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:subgrid;grid-row:span 7;row-gap:0;height:auto;margin-bottom:20px}
+ body #grid[data-view="grid"] .cardbody{display:contents}
+ body #grid[data-view="grid"] .poster-link{grid-row:1;align-self:start}
+ body #grid[data-view="grid"] .cardbody>.date{grid-row:2;margin:13px 4px 5px}
+ body #grid[data-view="grid"] .cardbody>h3{grid-row:3;min-height:0;margin:0 4px 10px;align-self:start}
+ body #grid[data-view="grid"] .cardbody>.card-tags{grid-row:4;align-self:start;margin:0 4px 10px}
+ body #grid[data-view="grid"] .cardbody>.card-summary{grid-row:5;margin:0 4px 8px}
+ body #grid[data-view="grid"] .cardbody>.card-stats{grid-row:6;margin:0 4px}
+ body #grid[data-view="grid"] .cardbody>.card-reviews,body #grid[data-view="grid"] .cardbody>.review-empty{grid-row:7;margin-left:4px;margin-right:4px;align-self:start}
+ @media(max-width:900px){body #grid[data-view="grid"] .card{margin-bottom:15px}}
+ @media(max-width:600px){body #grid[data-view="grid"] .card{margin-bottom:12px}body #grid[data-view="grid"] .cardbody>.date{margin-top:10px}}
+}
+/* Keep tags between title and summary in compact mobile list cards. */
+@media(max-width:600px){
+ body #grid[data-view="list"] .poster-link{grid-row:1 / 7}
+ body #grid[data-view="list"] .cardbody>.card-tags{grid-column:2;grid-row:3;margin:0;min-width:0}
+ body #grid[data-view="list"] .cardbody>.card-summary{grid-row:4}
+ body #grid[data-view="list"] .cardbody>.card-stats{grid-row:5}
+ body #grid[data-view="list"] .cardbody>.card-links{grid-row:6}
+ body #grid[data-view="list"] .cardbody>.card-reviews,body #grid[data-view="list"] .cardbody>.review-empty{grid-row:7}
+}
