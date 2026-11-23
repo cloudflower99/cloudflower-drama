@@ -7,22 +7,26 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css?v=20261123layout">
   <style>
-    .daily-container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    .daily-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-    .daily-header h1 { font-size: 24px; margin: 0; }
-    .generate-btn { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
-    .generate-btn:hover { filter: brightness(1.1); }
-    .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    
-    .daily-list { display: flex; flex-direction: column; gap: 20px; }
-    .daily-item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
-    .daily-item-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px; }
-    .daily-item-title { font-size: 20px; font-weight: 700; margin: 0; color: var(--text); }
-    .daily-item-rating { font-size: 16px; color: #bd964a; font-weight: 600; }
-    .daily-reviews { display: flex; flex-direction: column; gap: 12px; }
-    .daily-review { background: var(--soft); padding: 12px 16px; border-radius: 8px; font-size: 15px; color: var(--text); line-height: 1.5; }
-    .daily-review-meta { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
-    .empty-msg { color: var(--muted); font-size: 15px; }
+    body { background: radial-gradient(1200px 500px at 50% -100px, #e4ebff 0%, transparent 70%), var(--bg, #f6f8ff); }
+    .daily-container { max-width: 760px; margin: 28px auto 60px; padding: 0 16px; }
+    .daily-hero { text-align: center; padding: 26px 16px 22px; margin-bottom: 22px; border-radius: 22px; color: #fff; background: linear-gradient(120deg, #7f9cf0, #b49bf2); box-shadow: 0 10px 30px rgba(127,156,240,.35); }
+    .daily-hero h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: 1px; }
+    .daily-hero p { margin: 0 0 16px; opacity: .9; font-size: 14px; }
+    .generate-btn { background: #fff; color: #6a7fd0; border: none; padding: 11px 26px; border-radius: 999px; font-size: 16px; cursor: pointer; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.12); transition: transform .15s; }
+    .generate-btn:hover { transform: translateY(-2px); }
+    .generate-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .daily-list { display: flex; flex-direction: column; gap: 16px; }
+    .daily-item { position: relative; background: var(--surface, #fff); border: 1px solid var(--line, #e3eafa); border-radius: 18px; padding: 18px 18px 14px 22px; box-shadow: 0 4px 16px rgba(110,130,200,.08); overflow: hidden; }
+    .daily-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(#8aa4e8, #b79cf0); }
+    .daily-item-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .daily-item-title { font-size: 19px; font-weight: 700; margin: 0; color: var(--text); display: flex; align-items: center; gap: 10px; }
+    .rank { flex: none; width: 28px; height: 28px; border-radius: 50%; background: #c9d3ee; color: #fff; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+    .rank.r1 { background: #e0b24a; } .rank.r2 { background: #a9b4c8; } .rank.r3 { background: #c98b5a; }
+    .daily-item-rating { font-size: 15px; color: #bd964a; font-weight: 700; background: #fff8e8; padding: 4px 10px; border-radius: 999px; }
+    .daily-reviews { display: flex; flex-direction: column; gap: 8px; }
+    .daily-review { background: var(--soft, #f5f7ff); padding: 10px 14px; border-radius: 12px; font-size: 14.5px; color: var(--text); line-height: 1.6; }
+    .daily-review-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; display: flex; justify-content: space-between; }
+    .empty-msg { color: var(--muted); font-size: 15px; text-align: center; }
   </style>
 </head>
 <body>
@@ -32,9 +36,10 @@
     </div>
   </header>
   <main class="daily-container">
-    <div class="daily-header">
-      <h1 id="page-title">今日更新加载中...</h1>
-      <button id="btn-generate" class="generate-btn" disabled>生成分享图</button>
+    <div class="daily-hero">
+      <h1 id="page-title">今日更新</h1>
+      <p>按评分从高到低 · 附高赞短评</p>
+      <button id="btn-generate" class="generate-btn" disabled>📤 生成分享图</button>
     </div>
     <div id="content" class="daily-list">
       <p class="empty-msg">正在拉取最新数据，请稍候...</p>
@@ -64,14 +69,8 @@
       return '★'.repeat(whole) + (half ? '☆' : '') + '☆'.repeat(empty) + ' ' + num.toFixed(1);
     }
 
-    async function init() {
-      try {
-        const [dataRes, reviewsRes, optionsRes] = await Promise.all([
-          fetch('data.json').then(r => r.json()),
-          fetch('https://api.cloudofflower.ccwu.cc/reviews').then(r => r.json()),
-          fetch('https://api.cloudofflower.ccwu.cc/options').then(r => r.json())
-        ]);
-        
+    function build(dataRes, reviewsRes, optionsRes) {
+        {
         const items = dataRes.items || [];
         if (!items.length) throw new Error('没有剧集数据');
         
@@ -81,7 +80,7 @@
           if (item.date && item.date > maxDate) maxDate = item.date;
         }
         reportDate = maxDate;
-        titleEl.textContent = `今日更新 (${reportDate})`;
+        titleEl.textContent = `🌸 今日更新 ${reportDate}`;
         
         const todaysItems = items.filter(x => x.date === reportDate);
         
@@ -133,12 +132,26 @@
         
         renderDOM();
         btnGenerate.disabled = false;
-        
+        }
+    }
+
+    const J = (u) => fetch(u).then(r => r.json());
+    async function init() {
+      let cached = null;
+      try { cached = JSON.parse(localStorage.getItem('daily-cache') || 'null'); } catch {}
+      if (cached) { try { build(cached[0], cached[1], cached[2]); } catch {} }
+      try {
+        const res = await Promise.all([J('data.json'), J('https://api.cloudofflower.ccwu.cc/reviews'), J('https://api.cloudofflower.ccwu.cc/options')]);
+        build(...res);
+        try {
+          const slim = [{items: res[0].items.filter(x => x.date === reportDate)}, res[1], res[2]];
+          localStorage.setItem('daily-cache', JSON.stringify(slim));
+        } catch {}
       } catch (err) {
-        content.innerHTML = `<p class="empty-msg">加载失败：${err.message}</p>`;
+        if (!cached) content.innerHTML = `<p class="empty-msg">加载失败：${err.message}</p>`;
       }
     }
-    
+
     function renderDOM() {
       content.innerHTML = '';
       if (!dailyDramas.length) {
@@ -146,13 +159,15 @@
         return;
       }
       
+      let n = 0;
       for (const d of dailyDramas) {
+        n++;
         const wrap = document.createElement('div');
         wrap.className = 'daily-item';
         
         const header = document.createElement('div');
         header.className = 'daily-item-header';
-        header.innerHTML = `<h2 class="daily-item-title">${d.title}</h2>
+        header.innerHTML = `<h2 class="daily-item-title"><span class="rank r${n}">${n}</span>${d.title}</h2>
                             <div class="daily-item-rating">${renderStars(d.avgRating)}${d.ratingCount ? ` (${d.ratingCount}评)` : ''}</div>`;
         wrap.appendChild(header);
         
