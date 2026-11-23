@@ -103,18 +103,24 @@ def stale(ts, now, hours=24):
 def covers_exist(entries):
     return all(not e.get('image') or (out/e['image']).is_file() for e in entries)
 
-# Keep new catalogue entries usable for both reviews and community tags.
 def sync_review_options(items):
     import unicodedata
     def norm(value):
         return ''.join(c for c in unicodedata.normalize('NFKC', value).lower() if not c.isspace() and unicodedata.category(c)[0] not in ('P','S'))
+    def option_name(title):
+        return title.replace(',', '，')
     review_db='00a26fd4d86d827d959a010d5a9d4f12'
     def notion_json(path, method='GET', body=None):
         hdr=dict(headers)
         payload=None
         if body is not None:
             hdr['Content-Type']='application/json'; payload=json.dumps(body,ensure_ascii=False).encode()
-        return json.loads(request(BASE+path,hdr,method=method,data=payload)[0])
+        try:
+            return json.loads(request(BASE+path,hdr,method=method,data=payload)[0])
+        except urllib.error.HTTPError as e:
+            try: detail=e.read().decode('utf-8','replace')[:500]
+            except Exception: detail=''
+            raise RuntimeError(f'Notion {method} {path} 失败：HTTP {e.code} {detail}') from None
     def get_options():
         schema=notion_json('databases/'+review_db)
         result=schema.get('properties',{}).get('评论的剧',{}).get('select',{}).get('options')
@@ -130,20 +136,22 @@ def sync_review_options(items):
         if len(direct)==1: continue
         prefix=[x for x in no if len(x)>=4 and t.startswith(x) and sum(v.startswith(x) for v in nt)==1 and sum(v.startswith(x) for v in no)==1]
         if not direct and len(prefix)==1: continue
-        # Similar or ambiguous names may already own reviews. Never guess or duplicate.
         if direct or prefix or any(len(x)>=4 and (t.startswith(x) or x.startswith(t)) for x in no):
             ambiguous.append(title); continue
         to_create.append(title)
+    if to_create:
+        print('将新建评价选项',len(to_create),'个',flush=True)
     if len(to_create)>200: raise RuntimeError('需新建的评价选项过多，已停止发布，请核对资源名称')
     for title in to_create:
-        if len(title)>100: raise RuntimeError('剧名过长，无法创建评价选项：'+title[:40])
-        page=notion_json('pages','POST',{'parent':{'database_id':review_db},'properties':{'标题':{'title':[{'text':{'content':'系统配置临时条目（请勿评价）'}}]},'评论的剧':{'select':{'name':title}}}})
+        name=option_name(title)
+        if len(name)>100: raise RuntimeError('剧名过长，无法创建评价选项：'+title[:40])
+        print('新建评价选项：',name,flush=True)
+        page=notion_json('pages','POST',{'parent':{'database_id':review_db},'properties':{'标题':{'title':[{'text':{'content':'系统配置临时条目（请勿评价）'}}]},'评论的剧':{'select':{'name':name}}}})
         try: notion_json('pages/'+page['id'],'PATCH',{'archived':True})
         except Exception as e: raise RuntimeError('评价选项已创建但临时条目清理失败，请检查评价数据库回收站') from e
     if to_create:
         names=get_options()
-        if not all(t in names for t in to_create): raise RuntimeError('无法确认新剧的评价选项，已停止发布')
-    # Refresh the shared option cache before publishing; only public names are sent.
+        if not all(option_name(t) in names for t in to_create): raise RuntimeError('无法确认新剧的评价选项，已停止发布')
     url='https://api.cloudofflower.ccwu.cc/options?refresh=1'
     for attempt in range(10):
         try:
@@ -177,9 +185,6 @@ for group in children(ROOT):
 archive_pages=[x for x in children(ARCHIVE) if x['type']=='child_page' and re.match(r'^\d{4}-\d{2}-\d{2} 剧集$', x['child_page']['title'])]
 if len(archive_pages)<50: raise SystemExit('Archive looks incomplete: fewer than 50 daily pages; refusing to publish.')
 items=home[:]; updated_pages={}
-# Inspect the two newest daily pages each run. Parent page timestamps do not
-# reliably reflect edits to nested blocks; new and removed groups are detected
-# by their IDs while unchanged groups are reused. Reconcile details hourly.
 recent_days=set(sorted((p['child_page']['title'][:10] for p in archive_pages),reverse=True)[:2])
 for p in archive_pages:
     day=p['child_page']['title'][:10]; old=page_cache.get(p['id'],{}); entries=old.get('entries',[])
@@ -209,7 +214,6 @@ for p in archive_pages:
         print(day,len(entries),'cached',flush=True)
     items.extend(entries)
 if len(items)<350: raise SystemExit('Too few shows; refusing to publish incomplete catalog.')
-# New additions sort first within their resource date; historical order is preserved.
 items.sort(key=lambda x:(x['date'],x.get('added_at','')),reverse=True)
 sync_review_options(items)
 (out/'data.json').write_text(json.dumps({'generated':now.isoformat(),'items':items},ensure_ascii=False),encoding='utf-8')
