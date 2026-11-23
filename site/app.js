@@ -1,4 +1,10 @@
 'use strict';
+function resourceLink(name,raw){
+ let url;try{url=new URL(raw);if(url.protocol!=='https:')return null}catch{return null}
+ const group=document.createElement('span');group.className='resource-group';const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent=name+' ↗';group.append(link);
+ const code=url.searchParams.get('pwd');if(code){const button=document.createElement('button'),status=document.createElement('span');button.type='button';button.className='resource-copy';button.textContent='复制提取码';button.setAttribute('aria-label','复制'+name+'提取码');status.className='resource-copy-status';status.setAttribute('role','status');button.onclick=async()=>{let copied=false;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(code);copied=true}}catch{}if(!copied){let input=document.createElement('textarea');input.value=code;input.setAttribute('readonly','');input.style.cssText='position:fixed;left:-9999px;top:0';document.body.append(input);input.select();try{copied=document.execCommand('copy')}catch{}input.remove()}if(copied){status.textContent='';button.textContent='已复制 ✓';button.setAttribute('aria-label',name+'提取码已复制');setTimeout(()=>{button.textContent='复制提取码';button.setAttribute('aria-label','复制'+name+'提取码')},2000)}else{status.textContent='请手动复制：'+code}};group.append(button,status)}return group
+}
+
 const grid=document.querySelector('#grid'), count=document.querySelector('#count'), msg=document.querySelector('#message'), more=document.querySelector('#more'), q=document.querySelector('#q'), dateFilter=document.querySelector('#date-filter');
 let all=[],filtered=[],shown=0;const size=18;
 const mobileView=matchMedia('(max-width:600px)'),viewList=document.querySelector('#view-list'),viewGrid=document.querySelector('#view-grid'),viewStorageKey='cloudflower-catalog-view-v1';
@@ -110,7 +116,7 @@ function append(){
   body.append(element('p','card-summary',(x.description||'暂无简介').replace(/\s+/g,' ').trim()));
   const stats=element('div','card-stats');stats.append(CloudLikes.button('drama',x.title));
   if(review){const score=review.average?`★ ${review.average} / 5 · ${review.count} 条评分`:'☆ 暂无评分';stats.append(element('p','rating rating-live',score))}body.append(stats);
-  const links=element('div','card-links');for(const [name,raw] of Object.entries(x.links||{})){try{const dest=new URL(raw);if(dest.protocol!=='https:')continue;const link=element('a','',name+' ↗');link.href=dest.href;link.target='_blank';link.rel='noopener noreferrer';links.append(link)}catch{}}if(links.childElementCount)body.append(links);
+  const links=element('div','card-links');for(const [name,raw] of Object.entries(x.links||{})){const group=resourceLink(name,raw);if(group)links.append(group)}if(links.childElementCount)body.append(links);
 
   if(review)body.append(reviewPanel(review,x.title));else body.append(element('p','review-empty',reviewReady?(optionsFetched?'暂未匹配评价入口':'评价信息更新中…'):reviewSyncState==='failed'?'短评暂时无法加载，请重试。':'短评正在加载…'));
   card.append(body);grid.append(card);cardIndex++
