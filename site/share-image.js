@@ -17,7 +17,7 @@
  function show(){if(dialog.open)return;if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','')}
  async function present(producer,title,filename){const request=++generation;shareTitle=title;hint.textContent='正在生成图片…';preview.removeAttribute('src');share.hidden=true;save.hidden=true;show();try{const blob=await producer();if(request!==generation)return;if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(blob);preview.src=blobUrl;file=new File([blob],filename,{type:'image/png'});let canShare=false;try{canShare=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))}catch{}share.hidden=!canShare;save.hidden=false;hint.textContent='可以保存图片；手机也可以长按图片保存。'}catch(e){if(request!==generation)return;file=null;hint.textContent=e.message||'图片暂时无法生成，请稍后重试。'}}
  if(make)make.addEventListener('click',async()=>{if(!item)return;make.disabled=true;try{await present(()=>dramaPoster(item),item.title,'cloudflower-drama.png')}finally{make.disabled=false}});
- window.CloudShare={openReviews:(title,reviews)=>present(()=>reviewPoster(title,reviews),title,'cloudflower-reviews.png')};
+ window.CloudShare={present,openReviews:(title,reviews)=>present(()=>reviewPoster(title,reviews),title,'cloudflower-reviews.png')};
  share.addEventListener('click',async()=>{if(!file)return;try{await navigator.share({files:[file],title:shareTitle})}catch(e){if(e.name!=='AbortError')hint.textContent='分享未成功，可以保存或长按图片。'}});
  save.addEventListener('click',()=>{if(!blobUrl||!file)return;const a=document.createElement('a');a.href=blobUrl;a.download=file.name;document.body.append(a);a.click();a.remove();hint.textContent='如果没有自动保存，请长按图片保存。'});
  dialog.addEventListener('cancel',()=>{generation++});
