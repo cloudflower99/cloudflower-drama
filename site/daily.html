@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>今日更新分享 - 在云的背面种花</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css?v=20261123layout">
+  <style>
+    .daily-container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .daily-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .daily-header h1 { font-size: 24px; margin: 0; }
+    .generate-btn { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600; }
+    .generate-btn:hover { filter: brightness(1.1); }
+    .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .daily-list { display: flex; flex-direction: column; gap: 20px; }
+    .daily-item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+    .daily-item-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px; }
+    .daily-item-title { font-size: 20px; font-weight: 700; margin: 0; color: var(--text); }
+    .daily-item-rating { font-size: 16px; color: #bd964a; font-weight: 600; }
+    .daily-reviews { display: flex; flex-direction: column; gap: 12px; }
+    .daily-review { background: var(--soft); padding: 12px 16px; border-radius: 8px; font-size: 15px; color: var(--text); line-height: 1.5; }
+    .daily-review-meta { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .empty-msg { color: var(--muted); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="./">☁️ <span>在云的背面种花</span></a>
+    </div>
+  </header>
+  <main class="daily-container">
+    <div class="daily-header">
+      <h1 id="page-title">今日更新加载中...</h1>
+      <button id="btn-generate" class="generate-btn" disabled>生成分享图</button>
+    </div>
+    <div id="content" class="daily-list">
+      <p class="empty-msg">正在拉取最新数据，请稍候...</p>
+    </div>
+  </main>
+  
+  <script src="share-image.js"></script>
+  <script>
+    
+    const content = document.getElementById('content');
+    const titleEl = document.getElementById('page-title');
+    const btnGenerate = document.getElementById('btn-generate');
+    
+    let dailyDramas = [];
+    let reportDate = '';
+
+    function normalize(value) {
+      return (value || '').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+    }
+    
+    function renderStars(rating) {
+      const num = Number(rating) || 0;
+      if (!num) return '暂无评分';
+      const whole = Math.floor(num);
+      const half = num % 1 !== 0;
+      const empty = 5 - Math.ceil(num);
+      return '★'.repeat(whole) + (half ? '☆' : '') + '☆'.repeat(empty) + ' ' + num.toFixed(1);
+    }
+
+    async function init() {
+      try {
+        const [dataRes, reviewsRes, optionsRes] = await Promise.all([
+          fetch('data.json').then(r => r.json()),
+          fetch('https://api.cloudofflower.ccwu.cc/reviews').then(r => r.json()),
+          fetch('https://api.cloudofflower.ccwu.cc/options').then(r => r.json())
+        ]);
+        
+        const items = dataRes.items || [];
+        if (!items.length) throw new Error('没有剧集数据');
+        
+        // Find latest date
+        let maxDate = '';
+        for (const item of items) {
+          if (item.date && item.date > maxDate) maxDate = item.date;
+        }
+        reportDate = maxDate;
+        titleEl.textContent = `今日更新 (${reportDate})`;
+        
+        const todaysItems = items.filter(x => x.date === reportDate);
+        
+        // Map reviews
+        const options = optionsRes.options || [];
+        const reviews = reviewsRes.reviews || [];
+        
+        const nameIndex = new Map();
+        for (const opt of options) {
+          const normOpt = normalize(opt);
+          if (!nameIndex.has(normOpt)) nameIndex.set(normOpt, []);
+          nameIndex.get(normOpt).push(opt);
+        }
+        
+        const reviewGroups = new Map();
+        for (const r of reviews) {
+          if (!r.drama) continue;
+          if (!reviewGroups.has(r.drama)) reviewGroups.set(r.drama, []);
+          reviewGroups.get(r.drama).push(r);
+        }
+        
+        dailyDramas = todaysItems.map(item => {
+          const normTitle = normalize(item.title);
+          const matches = nameIndex.get(normTitle) || [];
+          let itemReviews = [];
+          if (matches.length === 1) {
+            itemReviews = reviewGroups.get(matches[0]) || [];
+          }
+          
+          const validRatings = itemReviews.filter(r => typeof r.rating === 'number' && r.rating > 0).map(r => r.rating);
+          const avg = validRatings.length ? validRatings.reduce((a, b) => a + b, 0) / validRatings.length : 0;
+          
+          // Get top 3 reviews (with text), sort by rating desc, then time desc
+          const textReviews = itemReviews.filter(r => r.content && r.content.trim()).sort((a, b) => {
+            if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+            return new Date(b.time || 0) - new Date(a.time || 0);
+          }).slice(0, 3);
+          
+          return {
+            title: item.title,
+            avgRating: avg,
+            ratingCount: validRatings.length,
+            reviews: textReviews
+          };
+        });
+        
+        // Sort by avgRating desc
+        dailyDramas.sort((a, b) => b.avgRating - a.avgRating || b.ratingCount - a.ratingCount || a.title.localeCompare(b.title));
+        
+        renderDOM();
+        btnGenerate.disabled = false;
+        
+      } catch (err) {
+        content.innerHTML = `<p class="empty-msg">加载失败：${err.message}</p>`;
+      }
+    }
+    
+    function renderDOM() {
+      content.innerHTML = '';
+      if (!dailyDramas.length) {
+        content.innerHTML = '<p class="empty-msg">今日没有更新剧集。</p>';
+        return;
+      }
+      
+      for (const d of dailyDramas) {
+        const wrap = document.createElement('div');
+        wrap.className = 'daily-item';
+        
+        const header = document.createElement('div');
+        header.className = 'daily-item-header';
+        header.innerHTML = `<h2 class="daily-item-title">${d.title}</h2>
+                            <div class="daily-item-rating">${renderStars(d.avgRating)}${d.ratingCount ? ` (${d.ratingCount}评)` : ''}</div>`;
+        wrap.appendChild(header);
+        
+        const revList = document.createElement('div');
+        revList.className = 'daily-reviews';
+        if (d.reviews.length) {
+          for (const r of d.reviews) {
+            const rev = document.createElement('div');
+            rev.className = 'daily-review';
+            rev.innerHTML = `<div class="daily-review-meta"><span>${r.author || '匿名观众'}</span><span style="color:#bd964a">${renderStars(r.rating)}</span></div>
+                             <div>${r.content}</div>`;
+            revList.appendChild(rev);
+          }
+        } else {
+          revList.innerHTML = '<div class="empty-msg" style="font-size:14px;">暂无短评</div>';
+        }
+        wrap.appendChild(revList);
+        
+        content.appendChild(wrap);
+      }
+    }
+    
+    // Canvas drawing
+    function wrapText(c, text, width) {
+      let out = [], line = '';
+      const input = String(text || '').replace(/\r\n?/g, '\n');
+      for (const ch of Array.from(input)) {
+        if (ch === '\n') { out.push(line); line = ''; continue; }
+        let next = line + ch;
+        if (line && c.measureText(next).width > width) {
+          out.push(line); line = ch;
+        } else line = next;
+      }
+      if (line) out.push(line);
+      return out;
+    }
+    
+    function drawRoundRect(c, x, y, w, h, r, fill, stroke) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.lineTo(x + w - r, y);
+      c.quadraticCurveTo(x + w, y, x + w, y + r);
+      c.lineTo(x + w, y + h - r);
+      c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      c.lineTo(x + r, y + h);
+      c.quadraticCurveTo(x, y + h, x, y + h - r);
+      c.lineTo(x, y + r);
+      c.quadraticCurveTo(x, y, x + r, y);
+      c.closePath();
+      if (fill) { c.fillStyle = fill; c.fill(); }
+      if (stroke) { c.strokeStyle = stroke; c.lineWidth = 2; c.stroke(); }
+    }
+    
+    async function generateImage() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      let c = canvas.getContext('2d');
+      
+      // Calculate heights
+      let currentY = 175;
+      const sections = [];
+      
+      for (const d of dailyDramas) {
+        c.font = '700 36px system-ui, sans-serif';
+        const titleLines = wrapText(c, d.title, 560);
+        let h = 40 + titleLines.length * 45;
+        
+        const revBlocks = [];
+        if (d.reviews.length) {
+          for (const r of d.reviews) {
+            c.font = '28px system-ui, sans-serif';
+            const contentLines = wrapText(c, r.content, 840);
+            const revH = 50 + contentLines.length * 40 + 20;
+            revBlocks.push({ r, lines: contentLines, h: revH });
+            h += revH;
+          }
+        } else {
+          h += 60; // empty message
+        }
+        
+        h += 20; // bottom padding
+        sections.push({ d, titleLines, revBlocks, y: currentY, h });
+        currentY += h + 30;
+      }
+      
+      const totalH = currentY + 100;
+      canvas.height = totalH;
+      c = canvas.getContext('2d');
+      
+      // Background gradient
+      let grad = c.createLinearGradient(0, 0, 1080, totalH);
+      grad.addColorStop(0, '#edf4ff');
+      grad.addColorStop(1, '#f5efff');
+      c.fillStyle = grad;
+      c.fillRect(0, 0, 1080, totalH);
+      
+      // Main border
+      drawRoundRect(c, 40, 40, 1000, totalH - 80, 32, '#ffffff', '#dbe4f7');
+      drawRoundRect(c, 50, 50, 980, totalH - 100, 24, null, '#edf0fa');
+      
+      // Header band
+      let hg = c.createLinearGradient(50, 50, 1030, 50);
+      hg.addColorStop(0, '#8aa4e8'); hg.addColorStop(1, '#b79cf0');
+      c.save(); drawRoundRect(c, 50, 50, 980, 90, 24, hg, null); c.restore();
+      c.fillStyle = '#ffffff'; c.fillRect(50, 100, 980, 40); c.fillStyle = hg; c.fillRect(50,100,980,40);
+      // Header
+      c.fillStyle = '#ffffff';
+      c.font = '700 24px system-ui, sans-serif';
+      c.textAlign = 'left';
+      c.fillText('☁ 在云的背面种花 · 当日更新分享', 90, 100);
+      c.fillStyle = '#ffffff';
+      c.textAlign = 'right';
+      c.fillText(reportDate, 990, 100);
+      
+      // Draw sections
+      for (const sec of sections) {
+        // Draw card bg
+        drawRoundRect(c, 90, sec.y, 900, sec.h, 20, '#f8faff', '#e3eafa');
+        
+        const idx = sections.indexOf(sec);
+        c.fillStyle = ['#e0b24a','#a9b4c8','#c98b5a'][idx] || '#c9d3ee';
+        c.beginPath(); c.arc(130, sec.y + 52, 18, 0, Math.PI*2); c.fill();
+        c.fillStyle = '#fff'; c.font = '700 20px system-ui, sans-serif'; c.textAlign = 'center';
+        c.fillText(String(idx+1), 130, sec.y + 59);
+        c.textAlign = 'left';
+        c.fillStyle = '#2d3856';
+        c.font = '700 36px system-ui, sans-serif';
+        sec.titleLines.forEach((line, i) => {
+          c.fillText(line, 165, sec.y + 62 + i * 45);
+        });
+        
+        c.textAlign = 'right';
+        c.fillStyle = '#bd964a';
+        c.font = '700 26px system-ui, sans-serif';
+        const ratingText = `${renderStars(sec.d.avgRating)}${sec.d.ratingCount ? ` (${sec.d.ratingCount})` : ''}`;
+        c.fillText(ratingText, 960, sec.y + 60);
+        
+        let ry = sec.y + 40 + sec.titleLines.length * 45 + 10;
+        
+        if (sec.revBlocks.length) {
+          for (const rb of sec.revBlocks) {
+             drawRoundRect(c, 110, ry, 860, rb.h - 10, 12, '#ffffff', null);
+             
+             c.textAlign = 'left';
+             c.fillStyle = '#8798bf';
+             c.font = '22px system-ui, sans-serif';
+             c.fillText(rb.r.author || '匿名观众', 130, ry + 35);
+             
+             c.textAlign = 'right';
+             c.fillStyle = '#bd964a';
+             c.fillText(renderStars(rb.r.rating), 950, ry + 35);
+             
+             c.textAlign = 'left';
+             c.fillStyle = '#40506c';
+             c.font = '26px system-ui, sans-serif';
+             rb.lines.forEach((line, i) => {
+               c.fillText(line, 130, ry + 80 + i * 40);
+             });
+             ry += rb.h;
+          }
+        } else {
+           c.textAlign = 'left';
+           c.fillStyle = '#8798bf';
+           c.font = '24px system-ui, sans-serif';
+           c.fillText('暂无短评', 120, ry + 35);
+        }
+      }
+      
+      // Footer
+      c.fillStyle = '#e8ecf7';
+      c.fillRect(90, totalH - 120, 900, 2);
+      c.fillStyle = '#8292b6';
+      c.font = '24px system-ui, sans-serif';
+      c.textAlign = 'center';
+      c.fillText('🌸 '+location.origin.replace(/^https?:\/\//,'')+location.pathname.replace(/daily\.html$/,'').replace(/\/$/,''), 540, totalH - 75);
+      
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('图片生成失败')), 'image/png');
+      });
+    }
+    
+    btnGenerate.addEventListener('click', () => {
+      if (window.CloudShare && window.CloudShare.present) {
+        window.CloudShare.present(generateImage, `今日更新 (${reportDate})`, 'daily-update.png');
+      } else {
+        alert('分享组件未就绪');
+      }
+    });
+
+    init();
+
+  </script>
+</body>
+</html>
