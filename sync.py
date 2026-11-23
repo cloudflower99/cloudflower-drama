@@ -134,7 +134,7 @@ def sync_review_options(items):
         if direct or prefix or any(len(x)>=4 and (t.startswith(x) or x.startswith(t)) for x in no):
             ambiguous.append(title); continue
         to_create.append(title)
-    if len(to_create)>30: raise RuntimeError('需新建的评价选项过多，已停止发布，请核对资源名称')
+    if len(to_create)>200: raise RuntimeError('需新建的评价选项过多，已停止发布，请核对资源名称')
     for title in to_create:
         if len(title)>100: raise RuntimeError('剧名过长，无法创建评价选项：'+title[:40])
         page=notion_json('pages','POST',{'parent':{'database_id':review_db},'properties':{'标题':{'title':[{'text':{'content':'系统配置临时条目（请勿评价）'}}]},'评论的剧':{'select':{'name':title}}}})
